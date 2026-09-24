@@ -61,9 +61,8 @@ Config.BlacklistZones = {
 -- Code
 ---------------------------------------------------------------------
 Config.Code = {
-    MinLength   = 4,
-    MaxLength   = 8,
-    OnlyDigits  = true,
+    Length      = 4,     -- nombre de chiffres = nombre de molettes du cryptex (3 à 8)
+    UseNui      = true,  -- true = interface cryptex (N°05), false = fenêtre texte ox_lib
     Salt        = 'change_moi_rsg_chest', -- changez cette valeur sur votre serveur
     MaxAttempts = 3,     -- essais avant blocage
     LockTime    = 120,   -- secondes de blocage après trop d'essais
@@ -159,12 +158,17 @@ Config.Text = {
     input_old       = 'Ancien code',
     input_new       = 'Nouveau code',
     title_new       = 'Définir le code du coffre',
+    nui_validate    = 'Valider',
+    nui_next        = 'Suivant',
+    nui_reset       = 'Remettre',
+    nui_cancel      = 'Annuler',
+    nui_help        = 'Molette / ▲▼ pour tourner · chiffres du clavier · Entrée pour valider · Échap pour annuler',
+    nui_step        = 'Étape %d / %d',
     placing         = 'Installation du coffre...',
     searching       = 'Perquisition en cours...',
     placement_help  = '[ENTRÉE] Valider  [RETOUR] Annuler  \n[Q/E] Rotation  [FLÈCHES] Déplacer  \n[PG↑/PG↓] Hauteur  [R] Sol  [G] Figer  [SHIFT] Rapide',
     code_mismatch   = 'Les codes ne correspondent pas.',
-    code_invalid    = 'Code invalide (%d à %d caractères%s).',
-    only_digits     = ', chiffres uniquement',
+    code_invalid    = 'Le code doit contenir %d chiffres.',
     placed          = 'Coffre installé.',
     wrong_code      = 'Code incorrect. (%d essai(s) restant(s))',
     locked          = 'Serrure bloquée, réessayez dans %d secondes.',

@@ -35,11 +35,9 @@ local function PlayScenario(scenario)
     TaskStartScenarioInPlace(PlayerPedId(), GetHashKey(scenario), -1, true, false, false, false)
 end
 
-local function codeField(label)
-    return {
-        type = 'input', label = label, password = true, required = true,
-        min = Config.Code.MinLength, max = Config.Code.MaxLength,
-    }
+local function Mismatch(a, b)
+    if a ~= b then return false, T.code_mismatch end
+    return true
 end
 
 ---------------------------------------------------------------------
@@ -176,12 +174,12 @@ RegisterNetEvent('rsg_chest:client:startPlacement', function(chestType)
         return
     end
 
-    local input = lib.inputDialog(T.title_new, { codeField(T.input_code), codeField(T.input_confirm) })
+    local input = RequestCode({
+        title = T.title_new,
+        steps = { T.input_code, T.input_confirm },
+        onSubmit = function(v) return Mismatch(v[1], v[2]) end,
+    })
     if not input then return end
-    if input[1] ~= input[2] then
-        lib.notify({ description = T.code_mismatch, type = 'error' })
-        return
-    end
 
     PlayScenario('WORLD_HUMAN_CROUCH_INSPECT')
     local done = lib.progressBar({
@@ -207,25 +205,35 @@ local function Notify(ok, msg)
 end
 
 local function OpenWithCode(id)
-    local input = lib.inputDialog(T.menu_open, { codeField(T.input_code) })
-    if not input then return end
-    local ok, msg = lib.callback.await('rsg_chest:server:openWithCode', false, id, input[1])
-    if not ok then Notify(false, msg) end
+    RequestCode({
+        title = Chests[id] and Chests[id].label or T.menu_open,
+        steps = { T.input_code },
+        onSubmit = function(v)
+            return lib.callback.await('rsg_chest:server:openWithCode', false, id, v[1])
+        end,
+    })
 end
 
 local function ChangeCode(id)
-    local input = lib.inputDialog(T.menu_change, {
-        codeField(T.input_old), codeField(T.input_new), codeField(T.input_confirm),
+    RequestCode({
+        title = T.menu_change,
+        steps = { T.input_old, T.input_new, T.input_confirm },
+        onSubmit = function(v)
+            local ok, msg = Mismatch(v[2], v[3])
+            if not ok then return ok, msg end
+            return lib.callback.await('rsg_chest:server:changeCode', false, id, v[1], v[2])
+        end,
     })
-    if not input then return end
-    if input[2] ~= input[3] then return Notify(false, T.code_mismatch) end
-    Notify(lib.callback.await('rsg_chest:server:changeCode', false, id, input[1], input[2]))
 end
 
 local function Pickup(id)
-    local input = lib.inputDialog(T.menu_pickup, { codeField(T.input_code) })
-    if not input then return end
-    Notify(lib.callback.await('rsg_chest:server:pickup', false, id, input[1]))
+    RequestCode({
+        title = T.menu_pickup,
+        steps = { T.input_code },
+        onSubmit = function(v)
+            return lib.callback.await('rsg_chest:server:pickup', false, id, v[1])
+        end,
+    })
 end
 
 local function Search(id)

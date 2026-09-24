@@ -16,14 +16,11 @@ end
 
 local function ValidCode(code)
     if type(code) ~= 'string' then return false end
-    local len = #code
-    if len < Config.Code.MinLength or len > Config.Code.MaxLength then return false end
-    if Config.Code.OnlyDigits and not code:match('^%d+$') then return false end
-    return true
+    return #code == Config.Code.Length and code:match('^%d+$') ~= nil
 end
 
 local function InvalidCodeMsg()
-    return T.code_invalid:format(Config.Code.MinLength, Config.Code.MaxLength, Config.Code.OnlyDigits and T.only_digits or '')
+    return T.code_invalid:format(Config.Code.Length)
 end
 
 local function StashId(id) return 'rsgchest_' .. id end

@@ -14,6 +14,7 @@ shared_scripts {
 }
 
 client_scripts {
+    'client/nui.lua',
     'client/placement.lua',
     'client/main.lua',
 }
@@ -21,6 +22,14 @@ client_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/main.lua',
+}
+
+ui_page 'html/index.html'
+
+files {
+    'html/index.html',
+    'html/style.css',
+    'html/script.js',
 }
 
 dependencies {

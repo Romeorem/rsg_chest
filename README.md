@@ -6,6 +6,9 @@ Coffres posables avec **code secret**, placement type **gizmo**, sauvegarde **SQ
 - Item utilisable → placement du prop fantôme qui suit la caméra, avec axes X/Y/Z affichés
   - `Q/E` rotation · `Flèches` déplacement fin · `PgUp/PgDn` hauteur · `R` poser au sol · `G` figer · `SHIFT` rapide · `ENTRÉE` valider · `RETOUR` annuler
   - Gizmo externe optionnel (`Config.Placement.ExternalGizmo`) pour un réglage 3 axes complet
+- Interface **cryptex à molettes** en HTML (modèle N°05) pour poser, ouvrir, ramasser et changer le code
+  - molette de la souris ou `▲▼` pour tourner, chiffres du clavier pour saisir, `←→` pour changer de molette, `Entrée` valider, `Échap` annuler
+  - nombre de molettes = `Config.Code.Length` (4 par défaut) ; `Config.Code.UseNui = false` pour revenir à la fenêtre ox_lib
 - Code défini à la pose (haché côté serveur, jamais envoyé au client)
 - Anti-bruteforce : X essais puis serrure bloquée, propriétaire prévenu
 - Propriétaire : changer le code, ramasser le coffre (vide), voir l'historique
