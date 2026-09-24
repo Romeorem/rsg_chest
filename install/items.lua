@@ -9,3 +9,7 @@
     chest_trunk     = { name = 'chest_trunk',     label = 'Malle de voyage', weight = 8000,  type = 'item', image = 'chest_trunk.png',     unique = false, useable = true, shouldClose = true, description = 'Une malle à code à poser' },
     chest_large     = { name = 'chest_large',     label = 'Grande malle',    weight = 12000, type = 'item', image = 'chest_large.png',     unique = false, useable = true, shouldClose = true, description = 'Une grande malle à code à poser' },
     chest_strongbox = { name = 'chest_strongbox', label = 'Coffre-fort',     weight = 15000, type = 'item', image = 'chest_strongbox.png', unique = false, useable = true, shouldClose = true, description = 'Un coffre-fort à code à poser' },
+
+    -- Crochetage et dynamite (ne pas ajouter s'ils existent déjà dans votre items.lua)
+    lockpick        = { name = 'lockpick',        label = 'Crochet',         weight = 100,   type = 'item', image = 'lockpick.png',        unique = false, useable = false, shouldClose = true, description = 'Pour forcer une serrure... discrètement' },
+    dynamite        = { name = 'dynamite',        label = 'Dynamite',        weight = 500,   type = 'item', image = 'dynamite.png',        unique = false, useable = false, shouldClose = true, description = 'Un bâton de dynamite. Très bruyant.' },

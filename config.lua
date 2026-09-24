@@ -134,6 +134,87 @@ Config.Perquisition = {
     SeizeMinGrade   = 1,
     SeizeRequireEmpty = false, -- si false, le contenu est détruit avec le coffre
     SeizeGiveItem   = false,  -- donne l'item du coffre à l'agent
+
+    -- Règles
+    MinOfficersNearby = 2,    -- agents en service à proximité (agent qui fouille inclus)
+    OfficersRadius    = 20.0,
+    Cooldown          = 1800, -- secondes entre deux fouilles d'un même coffre
+}
+
+---------------------------------------------------------------------
+-- Mandats de perquisition
+---------------------------------------------------------------------
+Config.Warrant = {
+    Required        = true,   -- pas de fouille sans mandat valide
+    SeizeRequiresWarrant = true,
+    IssueMinGrade   = 2,      -- grade minimum pour délivrer / révoquer un mandat
+    DefaultHours    = 24,
+    MaxHours        = 72,
+    SingleUse       = false,  -- true = le mandat est consommé à la première fouille
+}
+
+---------------------------------------------------------------------
+-- Partage des coffres (sans code)
+---------------------------------------------------------------------
+Config.Sharing = {
+    Enabled        = true,
+    Max            = 10,      -- nombre d'accès par coffre
+    OwnerNoCode    = true,    -- le propriétaire ouvre sans code
+    NearbyDistance = 5.0,     -- le joueur ajouté doit être à côté du propriétaire
+    AllowGang      = true,    -- partager avec tout un gang
+    AllowJob       = true,    -- partager avec tout un job (ranch, commerce...)
+}
+
+---------------------------------------------------------------------
+-- Crochetage (mini-jeu sur les molettes du cryptex)
+---------------------------------------------------------------------
+Config.Lockpick = {
+    Enabled        = true,
+    Item           = 'lockpick',
+    LawCanLockpick = false,
+    Wheels         = 4,       -- molettes à crocheter
+    TimeLimit      = 45,      -- secondes
+    MinSecondsPerWheel = 1.0, -- anti-triche : durée mini par molette
+    BreakChance    = 35,      -- % de casse du crochet à chaque erreur
+    MaxFails       = 4,       -- casse garantie après X erreurs
+    BreakOnSuccessChance = 15, -- % de casse même en cas de réussite
+    ChestCooldown  = 300,     -- secondes entre deux tentatives sur un même coffre
+    AlertChance    = 60,      -- % d'alerter la loi au début du crochetage
+    NotifyOwner    = true,
+}
+
+---------------------------------------------------------------------
+-- Dynamite
+---------------------------------------------------------------------
+Config.Dynamite = {
+    Enabled       = true,
+    Item          = 'dynamite',
+    LawCanUse     = false,
+    PlantDuration = 6000,     -- ms
+    Fuse          = 10,       -- secondes avant l'explosion
+    ExplosionType = 25,       -- type d'explosion RedM
+    AlertOnPlant  = false,    -- alerte dès la pose (sinon à l'explosion)
+    OpenTime      = 600,      -- secondes pendant lesquelles le coffre éventré est ouvert à tous
+    RemoveAfter   = true,     -- le coffre (et ce qu'il reste dedans) disparaît ensuite
+}
+
+---------------------------------------------------------------------
+-- Alertes envoyées aux forces de l'ordre
+---------------------------------------------------------------------
+Config.Alerts = {
+    BlipTime    = 120,        -- secondes
+    BlipRadius  = 60.0,       -- zone approximative affichée sur la carte
+    ServerEvent = nil,        -- ex: 'mon_dispatch:server:alert' (reçoit coords, message)
+}
+
+---------------------------------------------------------------------
+-- Coffres abandonnés
+---------------------------------------------------------------------
+Config.Abandon = {
+    Enabled        = true,
+    Days           = 30,      -- propriétaire non connecté depuis X jours
+    DeleteIfNoCharacter = true, -- personnage supprimé
+    CheckEveryHours = 6,
 }
 
 Config.LogsLimit = 25
@@ -191,4 +272,74 @@ Config.Text = {
     seize_confirm_d = 'Le coffre sera retiré et son contenu détruit.',
     no_logs         = 'Aucun historique.',
     already_placing = 'Vous êtes déjà en train de placer un objet.',
+
+    -- partage
+    menu_open_shared = 'Ouvrir',
+    menu_open_shared_d = 'Vous avez accès à ce coffre',
+    menu_access     = 'Gérer les accès',
+    access_title    = 'Accès au coffre',
+    access_add_player = 'Ajouter un joueur proche',
+    access_add_gang = 'Ajouter mon gang (%s)',
+    access_add_job  = 'Ajouter mon métier (%s)',
+    access_remove   = 'Retirer l\'accès',
+    access_none_near = 'Aucun joueur à proximité.',
+    access_added    = 'Accès ajouté.',
+    access_removed  = 'Accès retiré.',
+    access_exists   = 'Cet accès existe déjà.',
+    access_max      = 'Nombre maximum d\'accès atteint (%d).',
+    access_player   = 'Joueur',
+    access_gang     = 'Gang',
+    access_job      = 'Métier',
+
+    -- mandats
+    menu_warrant    = 'Délivrer un mandat',
+    warrant_title   = 'Mandat de perquisition',
+    warrant_target  = 'Cible',
+    warrant_t_chest = 'Ce coffre (#%d)',
+    warrant_t_owner = 'Le propriétaire (tous ses coffres)',
+    warrant_t_citizen = 'Citoyen (ID joueur ou citizenid)',
+    warrant_citizen = 'ID joueur ou citizenid',
+    warrant_reason  = 'Motif',
+    warrant_hours   = 'Durée (heures)',
+    warrant_issued  = 'Mandat #%d délivré.',
+    warrant_revoked = 'Mandat révoqué.',
+    warrant_valid   = 'Mandat #%d valide',
+    warrant_none    = 'Aucun mandat valide',
+    warrant_list    = 'Mandats en cours',
+    warrant_revoke  = 'Révoquer',
+    warrant_empty   = 'Aucun mandat en cours.',
+    warrant_bad_target = 'Cible introuvable.',
+    no_warrant      = 'Un mandat valide est nécessaire.',
+    not_enough_officers = 'Il faut au moins %d agents sur place.',
+    search_cooldown = 'Ce coffre a déjà été fouillé, réessayez dans %d min.',
+
+    -- crochetage
+    menu_lockpick   = 'Crocheter',
+    menu_lockpick_d = 'Nécessite un crochet',
+    lockpick_title  = 'Crochetage',
+    lockpick_help   = 'Tournez la molette jusqu\'au déclic, puis bloquez (Espace). ← → pour changer de molette.',
+    lockpick_lock   = 'Bloquer',
+    lockpick_slip   = 'Le crochet a glissé...',
+    lockpick_broken = 'Votre crochet s\'est cassé.',
+    lockpick_success = 'La serrure cède.',
+    lockpick_timeout = 'Trop lent, la serrure s\'est refermée.',
+    lockpick_cooldown = 'La serrure a déjà été forcée récemment, réessayez dans %d s.',
+    lockpick_owner  = 'Quelqu\'un crochète votre coffre (#%d) !',
+
+    -- dynamite
+    menu_dynamite   = 'Poser de la dynamite',
+    menu_dynamite_d = 'Fait sauter la serrure, très bruyant',
+    dynamite_plant  = 'Pose de la dynamite...',
+    dynamite_lit    = 'Mèche allumée ! Éloignez-vous (%d s).',
+    dynamite_countdown = 'Explosion dans %d s',
+    dynamite_armed  = 'De la dynamite est déjà posée.',
+    menu_loot       = 'Fouiller le coffre éventré',
+    menu_loot_d     = 'La serrure a sauté',
+    chest_destroyed = 'Le coffre (#%d) a été détruit.',
+
+    -- alertes
+    alert_lockpick  = 'Tentative d\'effraction sur un coffre signalée.',
+    alert_dynamite  = 'Explosion signalée ! Un coffre a été dynamité.',
+    alert_blip      = 'Alerte : coffre',
+    need_item       = 'Il vous faut : %s.',
 }

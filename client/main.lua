@@ -12,25 +12,6 @@ function GetLoadedChests() return Chests end
 ---------------------------------------------------------------------
 local function toVec(t) return vector3(t.x + 0.0, t.y + 0.0, t.z + 0.0) end
 
-local function IsLaw()
-    local job = PlayerData.job
-    if not job then return false end
-    local P = Config.Perquisition
-    if P.RequireOnDuty and not job.onduty then return false end
-    local minGrade = P.Jobs[job.name]
-    local grade = job.grade and job.grade.level or 0
-    if minGrade and grade >= minGrade then return true end
-    return P.AllowJobTypeLeo and job.type == 'leo'
-end
-
-local function JobGrade()
-    return PlayerData.job and PlayerData.job.grade and PlayerData.job.grade.level or 0
-end
-
-local function IsOwner(chest)
-    return PlayerData.citizenid and chest.owner == PlayerData.citizenid
-end
-
 local function PlayScenario(scenario)
     TaskStartScenarioInPlace(PlayerPedId(), GetHashKey(scenario), -1, true, false, false, false)
 end
@@ -204,6 +185,17 @@ local function Notify(ok, msg)
     if msg then lib.notify({ description = msg, type = ok and 'success' or 'error' }) end
 end
 
+local function Progress(duration, label)
+    PlayScenario('WORLD_HUMAN_CROUCH_INSPECT')
+    local done = lib.progressBar({
+        duration = duration, label = label,
+        useWhileDead = false, canCancel = true, disable = { move = true, combat = true },
+    })
+    ClearPedTasks(PlayerPedId())
+    if not done then Notify(false, T.cancelled) end
+    return done
+end
+
 local function OpenWithCode(id)
     RequestCode({
         title = Chests[id] and Chests[id].label or T.menu_open,
@@ -239,15 +231,7 @@ end
 local function Search(id)
     local ok, msg = lib.callback.await('rsg_chest:server:searchStart', false, id)
     if not ok then return Notify(false, msg) end
-
-    PlayScenario('WORLD_HUMAN_CROUCH_INSPECT')
-    local done = lib.progressBar({
-        duration = Config.Perquisition.Duration, label = T.searching,
-        useWhileDead = false, canCancel = true, disable = { move = true, combat = true },
-    })
-    ClearPedTasks(PlayerPedId())
-    if not done then return Notify(false, T.cancelled) end
-
+    if not Progress(Config.Perquisition.Duration, T.searching) then return end
     ok, msg = lib.callback.await('rsg_chest:server:searchFinish', false, id)
     if not ok then Notify(false, msg) end
 end
@@ -266,7 +250,7 @@ local function ShowLogs(id)
     local options = {}
     for _, log in ipairs(logs) do
         options[#options + 1] = {
-            title = ('%s — %s'):format(log.action, log.name or '?'),
+            title = ('%s — %s'):format(log.action, log.name or 'Système'),
             description = ('%s%s%s'):format(log.date or '', log.job and (' | ' .. log.job) or '',
                 log.details and (' | ' .. log.details) or ''),
             readOnly = true,
@@ -277,26 +261,246 @@ local function ShowLogs(id)
     lib.showContext('rsg_chest_logs')
 end
 
+---------------------------------------------------------------------
+-- Partage
+---------------------------------------------------------------------
+local ShowAccess
+
+local function AddNearbyPlayer(id)
+    local ids = {}
+    for _, p in ipairs(lib.getNearbyPlayers(GetEntityCoords(PlayerPedId()), Config.Sharing.NearbyDistance, false)) do
+        ids[#ids + 1] = GetPlayerServerId(p.id)
+    end
+    local names = #ids > 0 and lib.callback.await('rsg_chest:server:getNearbyNames', false, ids) or {}
+    if #names == 0 then return Notify(false, T.access_none_near) end
+
+    local options = {}
+    for _, p in ipairs(names) do
+        options[#options + 1] = {
+            title = p.name, description = ('ID %d'):format(p.id), icon = 'user-plus',
+            onSelect = function()
+                Notify(lib.callback.await('rsg_chest:server:shareAddPlayer', false, id, p.id))
+                ShowAccess(id)
+            end,
+        }
+    end
+    lib.registerContext({ id = 'rsg_chest_access_add', title = T.access_add_player, menu = 'rsg_chest_access', options = options })
+    lib.showContext('rsg_chest_access_add')
+end
+
+ShowAccess = function(id)
+    local info = lib.callback.await('rsg_chest:server:getChestInfo', false, id)
+    if not info or not info.isOwner then return end
+    local kinds = { citizen = T.access_player, gang = T.access_gang, job = T.access_job }
+    local icons = { citizen = 'user', gang = 'users', job = 'briefcase' }
+
+    local options = {
+        { title = T.access_add_player, icon = 'user-plus', onSelect = function() AddNearbyPlayer(id) end },
+    }
+    if info.gang then
+        options[#options + 1] = { title = T.access_add_gang:format(info.gangLabel or info.gang), icon = 'users',
+            onSelect = function()
+                Notify(lib.callback.await('rsg_chest:server:shareAddGroup', false, id, 'gang'))
+                ShowAccess(id)
+            end }
+    end
+    if info.job then
+        options[#options + 1] = { title = T.access_add_job:format(info.jobLabel or info.job), icon = 'briefcase',
+            onSelect = function()
+                Notify(lib.callback.await('rsg_chest:server:shareAddGroup', false, id, 'job'))
+                ShowAccess(id)
+            end }
+    end
+    for i, a in ipairs(info.shared or {}) do
+        options[#options + 1] = {
+            title = a.label, description = ('%s · %s'):format(kinds[a.type] or a.type, T.access_remove),
+            icon = icons[a.type] or 'user',
+            onSelect = function()
+                Notify(lib.callback.await('rsg_chest:server:shareRemove', false, id, i))
+                ShowAccess(id)
+            end,
+        }
+    end
+    lib.registerContext({ id = 'rsg_chest_access', title = T.access_title, menu = 'rsg_chest_menu', options = options })
+    lib.showContext('rsg_chest_access')
+end
+
+---------------------------------------------------------------------
+-- Mandats
+---------------------------------------------------------------------
+local function IssueWarrant(chestId)
+    local targets = {}
+    if chestId then
+        targets[#targets + 1] = { value = 'chest', label = T.warrant_t_chest:format(chestId) }
+        targets[#targets + 1] = { value = 'owner', label = T.warrant_t_owner }
+    end
+    targets[#targets + 1] = { value = 'citizen', label = T.warrant_t_citizen }
+
+    local input = lib.inputDialog(T.warrant_title, {
+        { type = 'select', label = T.warrant_target, options = targets, default = targets[1].value, required = true },
+        { type = 'input', label = T.warrant_citizen },
+        { type = 'input', label = T.warrant_reason, required = true, max = 250 },
+        { type = 'number', label = T.warrant_hours, default = Config.Warrant.DefaultHours,
+          min = 1, max = Config.Warrant.MaxHours, required = true },
+    })
+    if not input then return end
+    Notify(lib.callback.await('rsg_chest:server:issueWarrant', false, {
+        kind = input[1], chest = chestId, citizen = input[2], reason = input[3], hours = input[4],
+    }))
+end
+
+local function ShowWarrants()
+    local list, canRevoke = lib.callback.await('rsg_chest:server:getWarrants', false)
+    if not list then return Notify(false, T.not_allowed) end
+    local options = {}
+    for _, w in ipairs(list) do
+        local hours = math.floor(w.minutes / 60)
+        options[#options + 1] = {
+            title = ('#%d — %s'):format(w.id, w.target_name or '?'),
+            description = ('%s | %s | %dh%02d restantes | %d fouille(s)'):format(
+                w.reason or '', w.issued_name or '', hours, w.minutes % 60, w.uses or 0),
+            icon = 'file-signature',
+            readOnly = not canRevoke,
+            onSelect = canRevoke and function()
+                local answer = lib.alertDialog({ header = T.warrant_revoke .. (' #%d ?'):format(w.id), centered = true, cancel = true })
+                if answer == 'confirm' then
+                    Notify(lib.callback.await('rsg_chest:server:revokeWarrant', false, w.id))
+                end
+            end or nil,
+        }
+    end
+    if #options == 0 then options[1] = { title = T.warrant_empty, readOnly = true } end
+    lib.registerContext({ id = 'rsg_chest_warrants', title = T.warrant_list, options = options })
+    lib.showContext('rsg_chest_warrants')
+end
+
+RegisterCommand('mandat', function() IssueWarrant(nil) end, false)
+RegisterCommand('mandats', function() ShowWarrants() end, false)
+
+---------------------------------------------------------------------
+-- Crochetage & dynamite
+---------------------------------------------------------------------
+local function Lockpick(id)
+    local ok, data = lib.callback.await('rsg_chest:server:lockpickStart', false, id)
+    if not ok then return Notify(false, data) end
+
+    PlayScenario('WORLD_HUMAN_CROUCH_INSPECT')
+    local result = RequestLockpick({
+        title = T.lockpick_title,
+        digits = data.digits,
+        time = data.time,
+        onFail = function()
+            return lib.callback.await('rsg_chest:server:lockpickFail', false)
+        end,
+    })
+    ClearPedTasks(PlayerPedId())
+
+    if result == 'success' then
+        Notify(lib.callback.await('rsg_chest:server:lockpickSuccess', false))
+    elseif result == 'broken' then
+        Notify(false, T.lockpick_broken)
+    else
+        lib.callback.await('rsg_chest:server:lockpickCancel', false)
+        Notify(false, result == 'timeout' and T.lockpick_timeout or T.cancelled)
+    end
+end
+
+local function Dynamite(id)
+    if not Progress(Config.Dynamite.PlantDuration, T.dynamite_plant) then return end
+    local ok, msg = lib.callback.await('rsg_chest:server:dynamitePlant', false, id)
+    Notify(ok, msg)
+    if not ok then return end
+
+    CreateThread(function()
+        for left = Config.Dynamite.Fuse, 1, -1 do
+            lib.showTextUI(T.dynamite_countdown:format(left))
+            Wait(1000)
+        end
+        lib.hideTextUI()
+    end)
+end
+
+local function OpenBroken(id)
+    local ok, msg = lib.callback.await('rsg_chest:server:openBroken', false, id)
+    if not ok then Notify(false, msg) end
+end
+
+RegisterNetEvent('rsg_chest:client:explode', function(c)
+    AddExplosion(c.x + 0.0, c.y + 0.0, c.z + 0.2, Config.Dynamite.ExplosionType, 1.0, true, false, 1.0)
+end)
+
+---------------------------------------------------------------------
+-- Alertes (forces de l'ordre)
+---------------------------------------------------------------------
+RegisterNetEvent('rsg_chest:client:lawAlert', function(c, message)
+    lib.notify({ title = T.alert_blip, description = message, type = 'warning', duration = 10000 })
+    -- zone approximative, pas la position exacte
+    local r = Config.Alerts.BlipRadius
+    local x = c.x + (math.random() - 0.5) * r
+    local y = c.y + (math.random() - 0.5) * r
+    local blip = Citizen.InvokeNative(0x45F13B7E0A15C880, -1282792512, x, y, c.z, r) -- BlipAddForRadius
+    Citizen.InvokeNative(0x9CB1A1623062F402, blip, T.alert_blip)                   -- SetBlipName
+    SetTimeout(Config.Alerts.BlipTime * 1000, function()
+        if DoesBlipExist(blip) then RemoveBlip(blip) end
+    end)
+end)
+
+---------------------------------------------------------------------
+-- Menu du coffre
+---------------------------------------------------------------------
 function OpenChestMenu(id)
     local chest = Chests[id]
     if not chest then return end
+    local info = lib.callback.await('rsg_chest:server:getChestInfo', false, id)
+    if not info then return Notify(false, T.too_far) end
 
-    local options = {
-        { title = T.menu_open, description = T.menu_open_desc, icon = 'lock', onSelect = function() OpenWithCode(id) end },
-    }
-    if IsOwner(chest) then
-        options[#options + 1] = { title = T.menu_change, icon = 'key', onSelect = function() ChangeCode(id) end }
-        options[#options + 1] = { title = T.menu_pickup, icon = 'hand', onSelect = function() Pickup(id) end }
-        options[#options + 1] = { title = T.menu_logs, icon = 'list', onSelect = function() ShowLogs(id) end }
-    end
-    if IsLaw() then
-        options[#options + 1] = { title = T.menu_search, description = T.menu_search_desc, icon = 'magnifying-glass',
-            onSelect = function() Search(id) end }
-        if Config.Perquisition.CanSeize and JobGrade() >= Config.Perquisition.SeizeMinGrade then
-            options[#options + 1] = { title = T.menu_seize, icon = 'gavel', onSelect = function() Seize(id) end }
+    local options = {}
+    local function add(opt) options[#options + 1] = opt end
+
+    if info.broken then
+        add({ title = T.menu_loot, description = T.menu_loot_d, icon = 'box-open', onSelect = function() OpenBroken(id) end })
+    else
+        if info.hasAccess then
+            add({ title = T.menu_open_shared, description = T.menu_open_shared_d, icon = 'lock-open',
+                onSelect = function()
+                    local ok, msg = lib.callback.await('rsg_chest:server:openShared', false, id)
+                    if not ok then Notify(false, msg) end
+                end })
         end
-        if not IsOwner(chest) then
-            options[#options + 1] = { title = T.menu_logs, icon = 'list', onSelect = function() ShowLogs(id) end }
+        add({ title = T.menu_open, description = T.menu_open_desc, icon = 'lock', onSelect = function() OpenWithCode(id) end })
+    end
+
+    if info.isOwner then
+        add({ title = T.menu_change, icon = 'key', onSelect = function() ChangeCode(id) end })
+        if info.shared then
+            add({ title = T.menu_access, description = ('%d / %d'):format(#info.shared, Config.Sharing.Max),
+                icon = 'users', onSelect = function() ShowAccess(id) end })
+        end
+        add({ title = T.menu_pickup, icon = 'hand', onSelect = function() Pickup(id) end })
+        add({ title = T.menu_logs, icon = 'list', onSelect = function() ShowLogs(id) end })
+    end
+
+    if not info.broken and not info.armed then
+        if info.canLockpick then
+            add({ title = T.menu_lockpick, description = T.menu_lockpick_d, icon = 'unlock-keyhole', onSelect = function() Lockpick(id) end })
+        end
+        if info.canDynamite then
+            add({ title = T.menu_dynamite, description = T.menu_dynamite_d, icon = 'bomb', onSelect = function() Dynamite(id) end })
+        end
+    end
+
+    if info.isLaw then
+        local warrantText = info.warrant and T.warrant_valid:format(info.warrant) or T.warrant_none
+        add({ title = T.menu_search, description = ('%s · %s'):format(warrantText, info.ownerName or ''),
+            icon = 'magnifying-glass', onSelect = function() Search(id) end })
+        if info.canIssue then
+            add({ title = T.menu_warrant, icon = 'file-signature', onSelect = function() IssueWarrant(id) end })
+        end
+        if info.canSeize then
+            add({ title = T.menu_seize, icon = 'gavel', onSelect = function() Seize(id) end })
+        end
+        if not info.isOwner then
+            add({ title = T.menu_logs, icon = 'list', onSelect = function() ShowLogs(id) end })
         end
     end
 

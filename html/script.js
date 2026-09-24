@@ -9,6 +9,7 @@ const msgEl = $('msg');
 const state = {
     open: false,
     busy: false,
+    mode: 'code',        // 'code' | 'lockpick'
     length: 4,
     steps: [],
     stepIndex: 0,
@@ -16,6 +17,13 @@ const state = {
     digits: [],
     active: 0,
     text: {},
+    // crochetage
+    secret: [],
+    locked: [],
+    lockOrder: [],
+    deadline: 0,
+    duration: 0,
+    timer: null,
 };
 
 function post(name, data = {}) {
@@ -26,9 +34,10 @@ function post(name, data = {}) {
     }).then((r) => r.json()).catch(() => ({}));
 }
 
+const isLockpick = () => state.mode === 'lockpick';
+
 function buildWheels() {
     wheelsEl.innerHTML = '';
-    state.digits = new Array(state.length).fill(0);
     for (let i = 0; i < state.length; i++) {
         const wheel = document.createElement('div');
         wheel.className = 'wheel';
@@ -65,8 +74,16 @@ function buildWheels() {
         wheel.append(up, win, down);
         wheelsEl.appendChild(wheel);
     }
-    setActive(0);
     render();
+}
+
+function feedback(i) {
+    if (!isLockpick() || state.locked[i] || i !== state.active) return '';
+    const diff = Math.abs(state.digits[i] - state.secret[i]);
+    const dist = Math.min(diff, 10 - diff);
+    if (dist === 0) return 'click-strong';
+    if (dist === 1) return 'click-weak';
+    return '';
 }
 
 function render() {
@@ -74,7 +91,18 @@ function render() {
     wheelsEl.querySelectorAll('.wheel').forEach((w, i) => {
         w.querySelector('.strip').style.transform = `translateY(${-state.digits[i] * h}px)`;
         w.classList.toggle('active', i === state.active);
+        w.classList.toggle('locked', !!state.locked[i]);
+        const win = w.querySelector('.window');
+        win.classList.remove('click-weak', 'click-strong');
+        const fb = feedback(i);
+        if (fb) win.classList.add(fb);
     });
+
+    if (isLockpick()) {
+        $('step').textContent = `${state.locked.filter(Boolean).length} / ${state.length}`;
+        $('btn-validate').textContent = state.text.lock || 'Bloquer';
+        return;
+    }
     const total = state.steps.length;
     const label = state.steps[state.stepIndex] || '';
     $('step').textContent = total > 1
@@ -90,8 +118,16 @@ function setActive(i) {
     render();
 }
 
+function nextUnlocked(from, dir = 1) {
+    for (let n = 1; n <= state.length; n++) {
+        const i = (from + dir * n + state.length * 2) % state.length;
+        if (!state.locked[i]) return i;
+    }
+    return from;
+}
+
 function turn(i, dir) {
-    if (state.busy) return;
+    if (state.busy || state.locked[i]) return;
     state.digits[i] = (state.digits[i] + dir + 10) % 10;
     clearMsg();
     render();
@@ -114,10 +150,12 @@ function shake() {
     cryptex.classList.add('shake');
 }
 
+// ---------------------------------------------------------------- code
 async function validate() {
     if (state.busy) return;
-    state.values[state.stepIndex] = state.digits.join('');
+    if (isLockpick()) return lockWheel();
 
+    state.values[state.stepIndex] = state.digits.join('');
     if (state.stepIndex < state.steps.length - 1) {
         state.stepIndex++;
         resetDigits();
@@ -140,8 +178,72 @@ async function validate() {
     resetDigits();
 }
 
+// ---------------------------------------------------------------- crochetage
+async function lockWheel() {
+    const i = state.active;
+    if (state.locked[i]) return;
+
+    if (state.digits[i] === state.secret[i]) {
+        state.locked[i] = true;
+        state.lockOrder.push(i);
+        if (state.locked.filter(Boolean).length === state.length) {
+            state.busy = true;
+            stopTimer();
+            cryptex.classList.add('success');
+            render();
+            post('lockpickSuccess');
+            return;
+        }
+        setActive(nextUnlocked(i));
+        return;
+    }
+
+    state.busy = true;
+    const res = await post('lockpickFail');
+    shake();
+    showMsg(res && res.msg ? res.msg : '', 'bad');
+    if (res && res.broken) {
+        stopTimer();
+        return; // le client Lua ferme l'interface
+    }
+    state.busy = false;
+    // le crochet glisse : la dernière molette bloquée se libère
+    const last = state.lockOrder.pop();
+    if (last !== undefined) {
+        state.locked[last] = false;
+        state.digits[last] = Math.floor(Math.random() * 10);
+        setActive(last);
+    } else {
+        render();
+    }
+}
+
+function startTimer() {
+    stopTimer();
+    const bar = $('timer-bar');
+    state.timer = setInterval(() => {
+        const left = state.deadline - Date.now();
+        bar.style.transform = `scaleX(${Math.max(left, 0) / state.duration})`;
+        if (left <= 0) {
+            stopTimer();
+            if (!state.busy) {
+                state.busy = true;
+                shake();
+                post('lockpickTimeout');
+            }
+        }
+    }, 100);
+}
+
+function stopTimer() {
+    if (state.timer) clearInterval(state.timer);
+    state.timer = null;
+}
+
+// ---------------------------------------------------------------- ouverture
 function cancel() {
     if (!state.open) return;
+    stopTimer();
     post('cancel');
     close();
 }
@@ -149,24 +251,46 @@ function cancel() {
 function open(data) {
     state.open = true;
     state.busy = false;
-    state.length = Math.min(Math.max(parseInt(data.length, 10) || 4, 3), 8);
-    state.steps = data.steps && data.steps.length ? data.steps : ['Code'];
-    state.stepIndex = 0;
-    state.values = [];
+    state.mode = data.mode === 'lockpick' ? 'lockpick' : 'code';
     state.text = data.text || {};
+    state.values = [];
+    state.stepIndex = 0;
+    state.locked = [];
+    state.lockOrder = [];
+
+    if (isLockpick()) {
+        state.secret = (data.digits || [0, 0, 0, 0]).map((d) => parseInt(d, 10) || 0);
+        state.length = state.secret.length;
+        // départ aléatoire, jamais sur le bon chiffre
+        state.digits = state.secret.map((d) => (d + 2 + Math.floor(Math.random() * 7)) % 10);
+        state.locked = new Array(state.length).fill(false);
+        state.duration = Math.max(parseInt(data.time, 10) || 45, 5) * 1000;
+        state.deadline = Date.now() + state.duration;
+        state.steps = [];
+    } else {
+        state.length = Math.min(Math.max(parseInt(data.length, 10) || 4, 3), 8);
+        state.steps = data.steps && data.steps.length ? data.steps : ['Code'];
+        state.digits = new Array(state.length).fill(0);
+    }
+    state.active = 0;
 
     $('title').textContent = data.title || '';
     $('btn-reset').textContent = state.text.reset || 'Remettre';
+    $('btn-reset').classList.toggle('hidden', isLockpick());
+    $('timer').classList.toggle('hidden', !isLockpick());
+    $('timer-bar').style.transform = 'scaleX(1)';
     $('btn-cancel').setAttribute('aria-label', state.text.cancel || 'Annuler');
-    $('help').textContent = state.text.help || '';
+    $('help').textContent = isLockpick() ? (state.text.lockHelp || '') : (state.text.help || '');
     cryptex.classList.remove('success', 'shake');
     showMsg('');
     buildWheels();
     app.classList.remove('hidden');
+    if (isLockpick()) startTimer();
 }
 
 function close() {
     state.open = false;
+    stopTimer();
     app.classList.add('hidden');
 }
 
@@ -185,6 +309,16 @@ window.addEventListener('keydown', (e) => {
     const k = e.key;
     if (k === 'Escape') { e.preventDefault(); cancel(); return; }
     if (state.busy) return;
+
+    if (isLockpick()) {
+        if (k === ' ' || k === 'Enter') { e.preventDefault(); lockWheel(); }
+        else if (k === 'ArrowUp') { e.preventDefault(); turn(state.active, 1); }
+        else if (k === 'ArrowDown') { e.preventDefault(); turn(state.active, -1); }
+        else if (k === 'ArrowLeft') { e.preventDefault(); setActive(nextUnlocked(state.active, -1)); }
+        else if (k === 'ArrowRight' || k === 'Tab') { e.preventDefault(); setActive(nextUnlocked(state.active, 1)); }
+        return;
+    }
+
     if (/^[0-9]$/.test(k)) {
         state.digits[state.active] = parseInt(k, 10);
         clearMsg();
