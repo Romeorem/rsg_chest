@@ -1,0 +1,531 @@
+<title>Serrures de rsg_chest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rye&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Special+Elite&family=Cinzel:wght@500;700&family=Old+Standard+TT:wght@400;700&family=Share+Tech+Mono&family=Pirata+One&family=Courier+Prime:wght@400;700&family=Smokum&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --ground:#1b1511;
+  --ground-2:#241c16;
+  --ink:#ecdfc6;
+  --muted:#a8977c;
+  --line:#3d3027;
+  --accent:#c99a4b;
+  --ok:#7fb069;
+  --bad:#d4553f;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"Old Standard TT", Georgia, "Times New Roman", serif;
+  font-size:16px;
+  line-height:1.5;
+  padding-inline:16px;
+  padding-block:0 64px;
+  background-image:
+    radial-gradient(ellipse at 20% -10%, rgba(201,154,75,.10), transparent 55%),
+    radial-gradient(ellipse at 90% 10%, rgba(120,70,40,.12), transparent 50%);
+}
+.wrap{max-width:1240px;margin:0 auto}
+header.top{padding-block:48px 28px;display:grid;gap:10px;border-bottom:1px solid var(--line);margin-bottom:32px}
+.eyebrow{font-family:"Share Tech Mono", ui-monospace, monospace;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
+h1{font-family:"Rye", Georgia, serif;font-weight:400;font-size:clamp(34px,6vw,58px);line-height:1.05;margin:0;text-wrap:balance}
+.lede{max-width:64ch;color:var(--muted);margin:0}
+.lede b{color:var(--ink);font-weight:700}
+.demo{display:inline-flex;gap:8px;align-items:center;font-family:"Share Tech Mono",monospace;background:var(--ground-2);border:1px solid var(--line);padding:6px 12px;border-radius:3px;width:fit-content;color:var(--ink)}
+.demo code{color:var(--accent);font-size:18px;letter-spacing:.2em}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:22px}
+.card{background:var(--ground-2);border:1px solid var(--line);display:flex;flex-direction:column}
+.card-head{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;padding:16px 18px 14px;border-bottom:1px solid var(--line)}
+.num{grid-row:span 2;font-family:"Rye",serif;font-size:30px;color:var(--accent);line-height:1;padding-top:2px;font-variant-numeric:tabular-nums}
+.card-head h2{margin:0;font-size:19px;font-weight:700;line-height:1.2}
+.card-head p{margin:0;font-size:14px;color:var(--muted);line-height:1.4}
+.stage{flex:1;display:grid;place-items:center;padding:28px 16px;min-height:430px;isolation:isolate;background:
+  repeating-linear-gradient(90deg, rgba(255,255,255,.012) 0 2px, transparent 2px 7px), #15100c}
+.tags{display:flex;flex-wrap:wrap;gap:6px;padding:12px 18px 16px;border-top:1px solid var(--line)}
+.tag{font-family:"Share Tech Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);padding:2px 7px;border-radius:2px}
+
+/* ============ base clavier ============ */
+.kp{position:relative;width:268px;max-width:100%;display:flex;flex-direction:column;gap:12px;padding:20px;user-select:none;-webkit-user-select:none}
+.kp button{appearance:none;border:0;background:none;color:inherit;font:inherit;cursor:pointer;padding:0;touch-action:manipulation}
+.kp button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.kp-title{text-align:center;line-height:1.1}
+.screen{min-height:48px;display:flex;align-items:center;justify-content:center;gap:8px;font-variant-numeric:tabular-nums}
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.keys button{aspect-ratio:1/1;display:grid;place-items:center;font-size:22px;transition:transform .06s ease, filter .12s}
+.keys button:active{transform:translateY(2px) scale(.97)}
+.msg{text-align:center;font-size:13px;min-height:1.2em;letter-spacing:.06em}
+.kp.is-ok .msg{color:var(--ok)}
+.kp.is-bad .msg{color:var(--bad)}
+.kp.is-bad{animation:shake .38s}
+@keyframes shake{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+@media (prefers-reduced-motion: reduce){.kp.is-bad{animation:none}.keys button,.kp *{transition:none!important}}
+
+/* anneau */
+.ring{position:relative;width:220px;height:220px;margin:0 auto;max-width:100%}
+.ring .rk{position:absolute;left:50%;top:50%;width:38px;height:38px;margin:-19px 0 0 -19px;display:grid;place-items:center;font-size:18px;border-radius:50%}
+.ring .center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;gap:6px}
+.ring .center button{width:48px;height:48px;border-radius:50%;font-size:12px;letter-spacing:.08em}
+
+/* rouleaux */
+.wheels{display:flex;justify-content:center;gap:8px}
+.wheel{display:flex;flex-direction:column;align-items:center;gap:4px}
+.wheel .w-digit{width:46px;height:62px;display:grid;place-items:center;font-size:32px;font-variant-numeric:tabular-nums}
+.wheel .w-btn{width:46px;height:26px;font-size:13px}
+.wheels-actions{display:flex;justify-content:center;gap:10px}
+.wheels-actions button{padding:8px 18px;font-size:14px;letter-spacing:.1em}
+
+/* piano */
+.keys.k5{grid-template-columns:repeat(5,1fr);gap:4px}
+.keys.k5 button{aspect-ratio:auto;height:92px;align-items:end;padding-bottom:10px}
+.piano-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.piano-actions button{height:40px}
+
+/* ===== 01 Laiton & noyer ===== */
+.v1{background:
+  repeating-linear-gradient(100deg, rgba(0,0,0,.18) 0 1px, transparent 1px 9px),
+  repeating-linear-gradient(95deg, rgba(255,210,150,.05) 0 3px, transparent 3px 17px),
+  linear-gradient(160deg,#6b4026,#3a2213);
+  border-radius:10px;box-shadow:0 0 0 3px #b58b3c, 0 0 0 5px #3a2213, 0 0 0 7px #8a6526, 0 20px 40px rgba(0,0,0,.6);color:#f2dc9c}
+.v1 .kp-title{font-family:"Cinzel",serif;font-weight:700;letter-spacing:.2em;font-size:13px;text-transform:uppercase;color:#e5c77a}
+.v1 .screen{background:#120b06;border-radius:4px;box-shadow:inset 0 3px 10px #000, 0 1px 0 rgba(255,220,150,.2);font-family:"Cinzel",serif;font-size:26px;color:#f0c35a;text-shadow:0 0 8px rgba(240,195,90,.5);letter-spacing:.3em}
+.v1 .keys button{border-radius:50%;background:radial-gradient(circle at 34% 28%,#fff1b8,#d6a640 38%,#8a6219 78%,#5c3f0c);color:#3d2708;font-family:"Cinzel",serif;font-weight:700;box-shadow:0 3px 0 #3b2308,0 6px 10px rgba(0,0,0,.5), inset 0 -2px 3px rgba(0,0,0,.3)}
+.v1 .keys button.fn{font-size:12px;letter-spacing:.06em}
+.v1 .msg{font-family:"Cinzel",serif;color:#e5c77a}
+
+/* ===== 02 Cadran de coffre-fort ===== */
+.v2{width:290px;border-radius:50%;aspect-ratio:1/1;padding:30px;justify-content:center;background:
+  radial-gradient(circle at 50% 50%, #2a2c2f 0 46%, transparent 46.5%),
+  repeating-conic-gradient(from 0deg, #cfcfcf 0 .6deg, transparent .6deg 6deg),
+  radial-gradient(circle, #45484c 0 60%, #1d1e20 71%);
+  box-shadow:0 0 0 8px #151618, 0 0 0 10px #6d6f73, 0 20px 40px rgba(0,0,0,.7);color:#e8e6e1}
+.v2 .kp-title,.v2 .screen{display:none}
+.v2 .ring .rk{font-family:"Old Standard TT",serif;font-weight:700;color:#f4f1ea;background:radial-gradient(circle at 40% 35%,#5c5f63,#27292c);box-shadow:0 2px 4px rgba(0,0,0,.6)}
+.v2 .ring .center button{background:radial-gradient(circle at 40% 30%,#d7b25a,#7d5c1e);color:#241703;font-family:"Cinzel",serif;font-weight:700;box-shadow:0 3px 6px rgba(0,0,0,.6)}
+.v2 .dial-screen{position:absolute;left:50%;top:calc(50% + 38px);transform:translateX(-50%);font-family:"Share Tech Mono",monospace;color:#d7b25a;letter-spacing:.35em;font-size:16px}
+.v2 .msg{position:absolute;left:0;right:0;bottom:36px;font-family:"Cinzel",serif;font-size:12px}
+
+/* ===== 03 Parchemin & encre ===== */
+.v3{background:
+  radial-gradient(circle at 80% 20%, rgba(120,70,20,.25), transparent 30%),
+  radial-gradient(circle at 15% 85%, rgba(120,70,20,.28), transparent 35%),
+  radial-gradient(ellipse at center, #f1e2bd 40%, #d8bf88 100%);
+  color:#2b1d10;box-shadow:0 18px 40px rgba(0,0,0,.6);clip-path:polygon(2% 1%,20% 0,45% 2%,70% 0,98% 2%,100% 30%,99% 60%,100% 97%,75% 100%,50% 98%,25% 100%,1% 99%,0 70%,1% 35%)}
+.v3 .kp-title{font-family:"IM Fell English",serif;font-style:italic;font-size:20px}
+.v3 .screen{border-bottom:1.5px solid #2b1d10;font-family:"IM Fell English",serif;font-size:30px;letter-spacing:.3em;min-height:44px}
+.v3 .keys button{font-family:"IM Fell English",serif;font-size:26px;border:1.5px solid rgba(43,29,16,.8);border-radius:50%;box-shadow:inset 0 0 0 4px rgba(241,226,189,1), inset 0 0 0 5px rgba(43,29,16,.35)}
+.v3 .keys button:hover{background:rgba(43,29,16,.07)}
+.v3 .keys button.fn{font-size:14px;font-style:italic}
+.v3 .msg{font-family:"IM Fell English",serif;font-style:italic;font-size:15px}
+.v3.is-ok .msg{color:#2d5a1e}.v3.is-bad .msg{color:#8b1a0e}
+
+/* ===== 04 Fer forgé riveté ===== */
+.v4{background:
+  radial-gradient(circle at 12px 12px,#8a8580 0 3px,#222 3.5px,transparent 4.5px),
+  radial-gradient(circle at calc(100% - 12px) 12px,#8a8580 0 3px,#222 3.5px,transparent 4.5px),
+  radial-gradient(circle at 12px calc(100% - 12px),#8a8580 0 3px,#222 3.5px,transparent 4.5px),
+  radial-gradient(circle at calc(100% - 12px) calc(100% - 12px),#8a8580 0 3px,#222 3.5px,transparent 4.5px),
+  repeating-radial-gradient(circle at 30% 30%, rgba(255,255,255,.015) 0 2px, transparent 2px 5px),
+  linear-gradient(145deg,#3b3a3a,#1e1d1d);
+  border:2px solid #0e0e0e;box-shadow:inset 0 0 0 2px #4a4643,0 20px 40px rgba(0,0,0,.7);color:#d4ccbd;padding:28px}
+.v4 .kp-title{font-family:"Rye",serif;font-size:16px;letter-spacing:.1em;color:#b3a791}
+.v4 .screen{background:#0c0c0c;border:2px solid #555;font-family:"Rye",serif;font-size:24px;color:#e8732c;text-shadow:0 0 6px rgba(232,115,44,.6);letter-spacing:.3em}
+.v4 .keys button{font-family:"Rye",serif;background:linear-gradient(180deg,#4a4745,#292726);border:1px solid #111;box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 4px 0 #0c0c0c;color:#e3dac8}
+.v4 .keys button.fn{font-size:12px}
+.v4 .msg{font-family:"Rye",serif}
+
+/* ===== 05 Cryptex à rouleaux ===== */
+.v5{background:linear-gradient(180deg,#3a2616,#24170d);border-radius:8px;box-shadow:0 0 0 2px #7c5a2b,0 20px 40px rgba(0,0,0,.6);color:#f3dfae;padding:26px 18px}
+.v5 .kp-title{font-family:"Cinzel",serif;letter-spacing:.25em;font-size:12px;text-transform:uppercase;color:#d1ad63}
+.v5 .wheel .w-digit{font-family:"Cinzel",serif;font-weight:700;color:#2e1d07;background:linear-gradient(180deg,#6f5220 0%,#e6c26d 22%,#fff0bf 50%,#e6c26d 78%,#6f5220 100%);border-radius:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.6)}
+.v5 .wheel .w-btn{color:#d1ad63}
+.v5 .wheel .w-btn:hover{color:#fff0bf}
+.v5 .wheels{padding:8px;background:#140c06;border-radius:6px;box-shadow:inset 0 3px 10px #000}
+.v5 .wheels-actions button{font-family:"Cinzel",serif;font-weight:700;background:#7c5a2b;color:#fff0bf;border-radius:3px}
+.v5 .wheels-actions button.ghost{background:transparent;border:1px solid #7c5a2b}
+.v5 .msg{font-family:"Cinzel",serif}
+
+/* ===== 06 Télégraphe laqué ===== */
+.v6{background:#0e0d0c;border-radius:6px;box-shadow:inset 0 0 0 6px #0e0d0c, inset 0 0 0 7px #b9923f, 0 20px 40px rgba(0,0,0,.7);color:#e9dfc8;padding:26px}
+.v6 .kp-title{font-family:"Special Elite",monospace;font-size:14px;letter-spacing:.2em;color:#b9923f}
+.v6 .screen{background:#f1e8d2;color:#1b1917;font-family:"Special Elite",monospace;font-size:24px;letter-spacing:.3em;border-radius:2px}
+.v6 .keys button{border-radius:50%;background:radial-gradient(circle at 45% 35%,#fffdf6,#e8e0cc 60%,#b7ad95);color:#141312;font-family:"Special Elite",monospace;box-shadow:0 0 0 3px #1d1c1a,0 0 0 4px #b9923f,0 6px 8px rgba(0,0,0,.6)}
+.v6 .keys button.fn{font-size:12px}
+.v6 .msg{font-family:"Special Elite",monospace;color:#b9923f}
+
+/* ===== 07 Machine à écrire ===== */
+.v7{background:linear-gradient(180deg,#26282a,#141516);border-radius:18px 18px 8px 8px;box-shadow:0 20px 40px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.08);color:#f1f1ee}
+.v7 .kp-title{font-family:"Courier Prime",monospace;font-weight:700;letter-spacing:.3em;font-size:12px;text-transform:uppercase;color:#9da2a6}
+.v7 .screen{background:repeating-linear-gradient(0deg,#f5f1e6 0 23px,#d9d2c1 23px 24px);color:#1a1a1a;font-family:"Courier Prime",monospace;font-weight:700;font-size:26px;letter-spacing:.3em;border-radius:2px;box-shadow:0 -6px 0 #b6b1a4 inset}
+.v7 .keys{gap:14px;padding:6px}
+.v7 .keys button{border-radius:50%;background:radial-gradient(circle at 50% 40%,#2c2c2c,#0b0b0b 70%);color:#f7f5ef;font-family:"Courier Prime",monospace;font-weight:700;box-shadow:0 0 0 3px #c9ccce,0 0 0 4px #6d7174,0 7px 0 -1px #3b3d3f,0 9px 12px rgba(0,0,0,.6)}
+.v7 .keys button.fn{font-size:12px}
+.v7 .msg{font-family:"Courier Prime",monospace}
+
+/* ===== 08 Avis de recherche ===== */
+.v8{background:radial-gradient(ellipse at center,#e7d3a6 45%,#c7a86c 100%);color:#2a1a0c;box-shadow:0 18px 40px rgba(0,0,0,.6);padding:22px 22px 18px}
+.v8::before{content:"";position:absolute;top:8px;left:50%;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#aaa,#333)}
+.v8 .kp-title{font-family:"Rye",serif;font-size:34px;letter-spacing:.06em;border-bottom:3px double #2a1a0c;padding-bottom:4px}
+.v8 .kp-title small{display:block;font-family:"Old Standard TT",serif;font-size:11px;letter-spacing:.3em;font-weight:700}
+.v8 .screen{font-family:"Rye",serif;font-size:28px;letter-spacing:.3em;border:2px solid #2a1a0c}
+.v8 .keys button{font-family:"Rye",serif;border:2px solid #2a1a0c;background:rgba(255,245,215,.35)}
+.v8 .keys button:hover{background:#2a1a0c;color:#e7d3a6}
+.v8 .keys button.ok{background:#9c2a1b;color:#f6e5c1;border-color:#9c2a1b;font-size:13px;transform:rotate(-6deg)}
+.v8 .keys button.fn{font-size:13px}
+.v8 .msg{font-family:"Old Standard TT",serif;font-weight:700;text-transform:uppercase;letter-spacing:.2em;font-size:12px}
+.v8.is-ok .msg{color:#2d5a1e}.v8.is-bad .msg{color:#9c2a1b}
+
+/* ===== 09 Cadenas à combinaison ===== */
+.v9{margin-top:70px;background:linear-gradient(90deg,#6b6f73,#c7cbcf 30%,#8d9195 60%,#51555a);border-radius:18px;box-shadow:0 20px 40px rgba(0,0,0,.6);color:#1d1f21;padding:24px 16px}
+.v9::before{content:"";position:absolute;left:50%;top:-78px;width:150px;height:110px;transform:translateX(-50%);border:18px solid #9aa0a5;border-bottom:0;border-radius:80px 80px 0 0;box-shadow:inset 0 2px 0 rgba(255,255,255,.4);z-index:-1}
+.v9 .kp-title{font-family:"Old Standard TT",serif;font-weight:700;font-size:12px;letter-spacing:.35em;text-transform:uppercase}
+.v9 .wheels{background:#1b1c1e;padding:6px;border-radius:6px}
+.v9 .wheel .w-digit{background:linear-gradient(180deg,#0f1011,#3a3d40 30%,#50545a 50%,#3a3d40 70%,#0f1011);color:#f4f4f2;font-family:"Old Standard TT",serif;font-weight:700;border-radius:3px;box-shadow:inset 0 0 0 1px #000}
+.v9 .wheel .w-btn{color:#f4f4f2;background:#2c2e31;border-radius:3px}
+.v9 .wheels-actions button{background:#1d1f21;color:#e9eaeb;border-radius:4px;font-family:"Old Standard TT",serif;font-weight:700}
+.v9 .wheels-actions button.ghost{background:transparent;border:1px solid #1d1f21;color:#1d1f21}
+.v9 .msg{font-family:"Old Standard TT",serif;font-weight:700}
+.v9.is-ok .msg{color:#1e4f12}.v9.is-bad .msg{color:#8e1a0c}
+
+/* ===== 10 Sceaux de cire ===== */
+.v10{background:linear-gradient(180deg,#3b2b1c,#1f160e);border:1px solid #5c4430;box-shadow:0 20px 40px rgba(0,0,0,.6);color:#f0d9a6}
+.v10 .kp-title{font-family:"Pirata One",serif;font-size:26px;color:#d8b36a}
+.v10 .screen{font-family:"Pirata One",serif;font-size:30px;color:#d8b36a;letter-spacing:.3em;border-top:1px solid #5c4430;border-bottom:1px solid #5c4430}
+.v10 .keys button{font-family:"Pirata One",serif;font-size:26px;color:#f3c98a;background:radial-gradient(circle at 38% 32%,#d0412f,#8e1b12 62%,#5c0c07);border-radius:47% 53% 45% 55% / 52% 44% 56% 48%;box-shadow:0 4px 8px rgba(0,0,0,.6), inset 0 0 0 5px rgba(0,0,0,.12), inset 0 0 0 7px rgba(255,190,150,.15);text-shadow:0 -1px 0 rgba(0,0,0,.6),0 1px 0 rgba(255,210,170,.3)}
+.v10 .keys button:nth-child(3n){border-radius:55% 45% 52% 48% / 45% 55% 45% 55%}
+.v10 .keys button.fn{font-size:16px}
+.v10 .msg{font-family:"Pirata One",serif;font-size:17px}
+
+/* ===== 11 Carnet du shérif ===== */
+.v11{background:repeating-linear-gradient(180deg,#f3ecd9 0 27px,#b7c7d8 27px 28px);box-shadow:0 18px 40px rgba(0,0,0,.6), inset 30px 0 0 -28px #c7453b;color:#3a3a3e;padding-left:34px}
+.v11::before{content:"★";position:absolute;right:14px;top:10px;font-size:34px;color:#b8913a;text-shadow:0 1px 0 #6d531d}
+.v11 .kp-title{font-family:"IM Fell English",serif;font-style:italic;font-size:19px;text-align:left}
+.v11 .screen{justify-content:flex-start;font-family:"Special Elite",monospace;font-size:26px;letter-spacing:.3em;color:#3a3a3e}
+.v11 .keys button{font-family:"Special Elite",monospace;color:#3a3a3e;border:1.5px solid #6b6b70;border-radius:40% 45% 42% 48%;background:rgba(255,255,255,.25)}
+.v11 .keys button:hover{background:rgba(58,58,62,.08)}
+.v11 .keys button.fn{font-size:12px}
+.v11 .msg{font-family:"IM Fell English",serif;font-style:italic;text-align:left;font-size:15px}
+.v11.is-ok .msg{color:#2d5a1e}.v11.is-bad .msg{color:#a3261a}
+
+/* ===== 12 Banque de Saint-Denis ===== */
+.v12{background:
+  radial-gradient(ellipse at 30% 20%, rgba(255,255,255,.06), transparent 40%),
+  repeating-linear-gradient(125deg, rgba(0,0,0,.18) 0 2px, transparent 2px 22px),
+  linear-gradient(160deg,#1f4a3a,#0e2a20);
+  box-shadow:0 0 0 2px #c8a24f, inset 0 0 0 6px #0e2a20, inset 0 0 0 7px #c8a24f, 0 20px 40px rgba(0,0,0,.6);color:#f0dea8;padding:28px}
+.v12 .kp-title{font-family:"Cinzel",serif;font-weight:700;font-size:15px;letter-spacing:.22em;color:#e0c16f}
+.v12 .kp-title small{display:block;font-size:10px;letter-spacing:.4em;font-weight:500;margin-top:4px;color:#b99a52}
+.v12 .screen{background:#08170f;border:1px solid #c8a24f;font-family:"Cinzel",serif;font-size:24px;letter-spacing:.35em;color:#e0c16f}
+.v12 .keys button{font-family:"Cinzel",serif;font-weight:700;border-radius:50%;background:radial-gradient(circle at 40% 30%,#2f6b54,#123a2b);color:#f0dea8;box-shadow:0 0 0 2px #c8a24f,0 4px 8px rgba(0,0,0,.6)}
+.v12 .keys button.fn{font-size:11px;letter-spacing:.08em}
+.v12 .msg{font-family:"Cinzel",serif}
+
+/* ===== 13 Cuir cousu ===== */
+.v13{background:
+  radial-gradient(circle at 30% 30%, rgba(255,255,255,.05), transparent 50%),
+  repeating-radial-gradient(circle at 70% 60%, rgba(0,0,0,.08) 0 1px, transparent 1px 3px),
+  linear-gradient(160deg,#7a4a28,#4a2a15);
+  border-radius:14px;box-shadow:inset 0 0 0 8px transparent, 0 20px 40px rgba(0,0,0,.6);color:#f3dcb7}
+.v13::after{content:"";position:absolute;inset:8px;border:2px dashed #e8c48d;border-radius:9px;pointer-events:none;opacity:.8}
+.v13 .kp-title{font-family:"Smokum",serif;font-size:26px;color:#f3dcb7;text-shadow:0 -1px 0 rgba(0,0,0,.5)}
+.v13 .screen{background:#2e190b;border-radius:6px;box-shadow:inset 0 2px 8px rgba(0,0,0,.8);font-family:"Smokum",serif;font-size:28px;letter-spacing:.3em}
+.v13 .keys button{font-family:"Smokum",serif;font-size:26px;background:linear-gradient(160deg,#8b5731,#5a331a);border-radius:10px;color:#f3dcb7;box-shadow:inset 0 1px 0 rgba(255,220,180,.25),inset 0 -2px 0 rgba(0,0,0,.35),0 3px 5px rgba(0,0,0,.5);text-shadow:0 -1px 0 rgba(0,0,0,.6)}
+.v13 .keys button.fn{font-size:15px}
+.v13 .msg{font-family:"Old Standard TT",serif}
+
+/* ===== 14 Os & corne ===== */
+.v14{background:linear-gradient(160deg,#2a221c,#120e0b);border-radius:6px;box-shadow:0 0 0 1px #4d4036,0 20px 40px rgba(0,0,0,.7);color:#efe6d2}
+.v14 .kp-title{font-family:"IM Fell English SC",serif;font-size:18px;letter-spacing:.15em;color:#d9ccaf}
+.v14 .screen{border:1px solid #6e604f;font-family:"IM Fell English SC",serif;font-size:26px;letter-spacing:.35em;color:#efe6d2}
+.v14 .keys button{font-family:"IM Fell English SC",serif;font-size:24px;border-radius:44% 44% 40% 40% / 50% 50% 44% 44%;background:radial-gradient(ellipse at 40% 30%,#fffaf0,#eadfc6 50%,#c7b797);color:#2b241c;box-shadow:0 3px 0 #7d6f58,0 6px 10px rgba(0,0,0,.6);background-image:radial-gradient(ellipse at 40% 30%,#fffaf0,#eadfc6 50%,#c7b797),repeating-linear-gradient(80deg,rgba(0,0,0,.04) 0 1px,transparent 1px 4px);background-blend-mode:multiply}
+.v14 .keys button.fn{font-size:13px}
+.v14 .msg{font-family:"IM Fell English",serif;font-style:italic}
+
+/* ===== 15 Minimal RP ===== */
+.v15{background:rgba(18,16,15,.92);border:1px solid rgba(236,223,198,.14);border-radius:14px;backdrop-filter:blur(6px);box-shadow:0 20px 40px rgba(0,0,0,.6);color:#ecdfc6}
+.v15 .kp-title{font-family:"Share Tech Mono",monospace;font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:#a8977c;text-align:left}
+.v15 .screen{justify-content:flex-start;gap:12px}
+.v15 .screen .slot{width:14px;height:14px;border-radius:50%;border:1.5px solid rgba(236,223,198,.35)}
+.v15 .screen .slot.on{background:#c99a4b;border-color:#c99a4b;box-shadow:0 0 10px rgba(201,154,75,.6)}
+.v15 .keys button{font-family:"Share Tech Mono",monospace;font-size:22px;border-radius:10px;background:rgba(236,223,198,.05);border:1px solid rgba(236,223,198,.08);color:#ecdfc6}
+.v15 .keys button:hover{background:rgba(236,223,198,.12)}
+.v15 .keys button.ok{background:#c99a4b;color:#1b1511;border-color:#c99a4b;font-size:13px}
+.v15 .keys button.fn{font-size:13px}
+.v15 .msg{font-family:"Share Tech Mono",monospace;text-align:left}
+
+/* ===== 16 Jetons de poker ===== */
+.v16{background:radial-gradient(ellipse at center,#1f6b3a,#0f3d20 80%);border-radius:10px;box-shadow:0 0 0 10px #4b2c16,0 0 0 12px #2c190b,0 20px 40px rgba(0,0,0,.7);color:#fff}
+.v16 .kp-title{font-family:"Rye",serif;font-size:18px;color:#f3d98a}
+.v16 .screen{font-family:"Rye",serif;font-size:26px;letter-spacing:.3em;color:#f3d98a;border:1px dashed rgba(243,217,138,.5);border-radius:40px}
+.v16 .keys button{--c:#b52a2a;font-family:"Old Standard TT",serif;font-weight:700;font-size:20px;border-radius:50%;background:radial-gradient(circle,#f4efe4 0 42%,var(--c) 43% 100%);color:#1b1b1b;box-shadow:inset 0 0 0 5px var(--c),inset 0 0 0 9px #fff0,0 4px 0 rgba(0,0,0,.35),0 6px 10px rgba(0,0,0,.4);outline:3px dashed #f4efe4;outline-offset:-7px}
+.v16 .keys button:focus-visible{outline:3px solid #fff}
+.v16 .keys button:nth-child(3n+2){--c:#1f3f8c}
+.v16 .keys button:nth-child(3n){--c:#222}
+.v16 .keys button.fn{font-size:12px}
+.v16 .keys button.ok{--c:#c5962f}
+.v16 .msg{font-family:"Rye",serif;color:#f3d98a}
+
+/* ===== 17 Cadran de montre ===== */
+.v17{width:290px;aspect-ratio:1/1;border-radius:50%;padding:30px;justify-content:center;background:
+  radial-gradient(circle,#fbf6ea 0 60%,#efe4cb 70%,#e6d7b6 71%);
+  box-shadow:0 0 0 10px #c89d45,0 0 0 12px #7c5a1f,0 0 0 14px #e3c67a,0 20px 40px rgba(0,0,0,.6);color:#1f1a14}
+.v17 .kp-title,.v17 .screen{display:none}
+.v17 .ring .rk{font-family:"IM Fell English SC",serif;font-size:22px;color:#1f1a14}
+.v17 .ring .rk:hover{color:#8a1d12}
+.v17 .ring .center button{background:#1f1a14;color:#f6eedb;font-family:"IM Fell English SC",serif}
+.v17 .ring .center button.ghost{background:transparent;color:#1f1a14;border:1px solid #1f1a14}
+.v17 .dial-screen{position:absolute;left:50%;top:calc(50% + 40px);transform:translateX(-50%);font-family:"IM Fell English SC",serif;letter-spacing:.35em;font-size:17px}
+.v17 .msg{position:absolute;left:0;right:0;top:calc(50% - 64px);font-family:"IM Fell English",serif;font-style:italic;font-size:12px}
+.v17.is-ok .msg{color:#2d5a1e}.v17.is-bad .msg{color:#8a1d12}
+
+/* ===== 18 Pierre gravée ===== */
+.v18{background:
+  radial-gradient(circle at 20% 30%, rgba(255,255,255,.06), transparent 25%),
+  radial-gradient(circle at 70% 80%, rgba(0,0,0,.2), transparent 30%),
+  repeating-conic-gradient(from 10deg at 40% 40%, rgba(255,255,255,.02) 0 3deg, transparent 3deg 9deg),
+  linear-gradient(160deg,#7d7a74,#4d4a45);
+  border-radius:4px;box-shadow:0 20px 40px rgba(0,0,0,.7);color:#2a2825;clip-path:polygon(1% 3%,40% 0,97% 2%,100% 45%,98% 98%,55% 100%,3% 97%,0 50%)}
+.v18 .kp-title{font-family:"Cinzel",serif;font-weight:700;letter-spacing:.3em;font-size:14px;color:#2c2a26;text-shadow:0 1px 0 rgba(255,255,255,.25)}
+.v18 .screen{font-family:"Cinzel",serif;font-weight:700;font-size:28px;letter-spacing:.35em;color:#2c2a26;text-shadow:0 1px 0 rgba(255,255,255,.25);background:rgba(0,0,0,.12);box-shadow:inset 0 2px 5px rgba(0,0,0,.5)}
+.v18 .keys button{font-family:"Cinzel",serif;font-weight:700;font-size:24px;color:#2c2a26;background:rgba(0,0,0,.08);border-radius:4px;box-shadow:inset 0 3px 6px rgba(0,0,0,.45),inset 0 -1px 0 rgba(255,255,255,.2);text-shadow:0 1px 0 rgba(255,255,255,.3)}
+.v18 .keys button.fn{font-size:12px}
+.v18 .msg{font-family:"Cinzel",serif;font-weight:700;color:#1c1a18}
+
+/* ===== 19 Touches de piano ===== */
+.v19{width:300px;background:linear-gradient(180deg,#2b150c,#140905);border-radius:8px;box-shadow:0 0 0 2px #7a4a22,0 20px 40px rgba(0,0,0,.7);color:#f6efe0;padding:20px 14px}
+.v19 .kp-title{font-family:"IM Fell English",serif;font-style:italic;font-size:20px;color:#d9b67a}
+.v19 .screen{font-family:"IM Fell English",serif;font-size:26px;letter-spacing:.3em;color:#d9b67a;background:#0a0402;border-radius:3px}
+.v19 .keys.k5 button{font-family:"Old Standard TT",serif;font-weight:700;font-size:18px;background:linear-gradient(180deg,#fffdf6,#eee6d3);color:#231710;border-radius:0 0 5px 5px;box-shadow:inset 0 -6px 0 #d8cdb5,0 3px 0 #000}
+.v19 .keys.k5 button:active{box-shadow:inset 0 -2px 0 #d8cdb5,0 1px 0 #000}
+.v19 .piano-actions button{background:linear-gradient(180deg,#222,#050505);color:#f6efe0;border-radius:0 0 5px 5px;font-family:"Old Standard TT",serif;font-weight:700;font-size:13px;letter-spacing:.1em;box-shadow:0 3px 0 #000}
+.v19 .msg{font-family:"IM Fell English",serif;font-style:italic}
+
+/* ===== 20 Lanterne de nuit ===== */
+.v20{background:radial-gradient(ellipse at 50% 0%,#2d2a3f,#0d0c16 70%);border-radius:12px;box-shadow:0 0 0 1px #3a3550,0 20px 40px rgba(0,0,0,.7);color:#ffcf7a}
+.v20 .kp-title{font-family:"Smokum",serif;font-size:24px;color:#ffcf7a;text-shadow:0 0 12px rgba(255,170,60,.7)}
+.v20 .screen{font-family:"Smokum",serif;font-size:30px;letter-spacing:.3em;color:#ffdd99;text-shadow:0 0 10px rgba(255,170,60,.9),0 0 24px rgba(255,120,20,.5)}
+.v20 .keys button{font-family:"Smokum",serif;font-size:24px;border-radius:50%;color:#ffe2a8;background:radial-gradient(circle,rgba(255,170,60,.28),rgba(255,120,20,.05) 70%);border:1px solid rgba(255,190,100,.35);text-shadow:0 0 8px rgba(255,170,60,.9)}
+.v20 .keys button:hover{background:radial-gradient(circle,rgba(255,190,90,.5),rgba(255,120,20,.1) 70%);box-shadow:0 0 18px rgba(255,150,40,.45)}
+.v20 .keys button.fn{font-size:14px}
+.v20 .msg{font-family:"Old Standard TT",serif}
+
+/* ===== 21 Pyrogravure ===== */
+.v21{background:
+  radial-gradient(ellipse at center, transparent 55%, rgba(60,25,5,.55) 100%),
+  repeating-linear-gradient(92deg, rgba(120,70,20,.12) 0 2px, transparent 2px 11px),
+  linear-gradient(170deg,#e4c28f,#c99e62);
+  border-radius:4px;box-shadow:0 20px 40px rgba(0,0,0,.6);color:#3a1c07}
+.v21 .kp-title{font-family:"Sancreek","Rye",serif;font-family:"Rye",serif;font-size:20px;color:#4a2208;text-shadow:0 0 3px rgba(80,30,0,.4)}
+.v21 .screen{font-family:"Rye",serif;font-size:28px;letter-spacing:.3em;color:#3a1c07;text-shadow:0 0 4px rgba(80,30,0,.45);border-top:2px solid rgba(58,28,7,.7);border-bottom:2px solid rgba(58,28,7,.7)}
+.v21 .keys button{font-family:"Rye",serif;font-size:24px;color:#3a1c07;text-shadow:0 0 4px rgba(80,30,0,.5);border-radius:50%;box-shadow:inset 0 0 0 2px rgba(58,28,7,.75),inset 0 0 8px rgba(80,30,0,.35)}
+.v21 .keys button:hover{background:rgba(80,30,0,.1)}
+.v21 .keys button.fn{font-size:12px}
+.v21 .msg{font-family:"Rye",serif;font-size:14px}
+.v21.is-ok .msg{color:#2d5a1e}.v21.is-bad .msg{color:#8e1a0c}
+
+/* ===== 22 Morse ===== */
+.v22{background:linear-gradient(180deg,#2f2117,#1a120c);border:1px solid #5e4630;box-shadow:0 20px 40px rgba(0,0,0,.6);color:#e7d2a4}
+.v22 .kp-title{font-family:"Special Elite",monospace;font-size:13px;letter-spacing:.2em;color:#c9a35a}
+.v22 .screen{background:#efe3c3;color:#2a1c0f;font-family:"Courier Prime",monospace;font-weight:700;font-size:15px;letter-spacing:.12em;border-radius:2px;padding:6px 8px;flex-wrap:wrap;gap:10px;min-height:52px}
+.v22 .keys button{border-radius:50%;background:radial-gradient(circle at 40% 30%,#3a2a1e,#140d08);color:#e7d2a4;font-family:"Special Elite",monospace;box-shadow:0 0 0 3px #b88a3e,0 6px 0 -1px #5a3f1c,0 8px 10px rgba(0,0,0,.6)}
+.v22 .keys button.fn{font-size:12px}
+.v22 .msg{font-family:"Special Elite",monospace}
+
+/* ===== 23 Cuivre vert-de-gris ===== */
+.v23{background:
+  radial-gradient(circle at 20% 25%, rgba(80,170,150,.55), transparent 30%),
+  radial-gradient(circle at 80% 70%, rgba(80,170,150,.45), transparent 35%),
+  radial-gradient(circle at 60% 20%, rgba(190,110,60,.5), transparent 30%),
+  linear-gradient(150deg,#9b5a32,#5e3219);
+  border-radius:10px;box-shadow:0 0 0 3px #3a2010,0 20px 40px rgba(0,0,0,.6);color:#f1e2c9}
+.v23 .kp-title{font-family:"Cinzel",serif;font-weight:700;font-size:14px;letter-spacing:.25em;color:#fbe8c8;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.v23 .screen{background:#122a26;border:2px solid #3a2010;font-family:"Share Tech Mono",monospace;font-size:26px;letter-spacing:.35em;color:#8ee0c8;text-shadow:0 0 8px rgba(142,224,200,.6)}
+.v23 .keys button{font-family:"Cinzel",serif;font-weight:700;border-radius:8px;color:#2a160a;background:radial-gradient(circle at 30% 25%,#f3c29b,#c07a4a 50%,#7e4424);box-shadow:0 3px 0 #3a2010,0 5px 8px rgba(0,0,0,.5),inset 0 0 6px rgba(80,170,150,.55)}
+.v23 .keys button.fn{font-size:11px}
+.v23 .msg{font-family:"Cinzel",serif;color:#fbe8c8}
+
+/* ===== 24 Journal de 1899 ===== */
+.v24{background:#e9e2d0;color:#15130f;box-shadow:0 18px 40px rgba(0,0,0,.6);padding:18px}
+.v24 .kp-title{font-family:"Pirata One",serif;font-size:28px;border-bottom:3px double #15130f;padding-bottom:4px}
+.v24 .kp-title small{display:flex;justify-content:space-between;font-family:"Old Standard TT",serif;font-size:10px;letter-spacing:.12em;text-transform:uppercase;border-top:1px solid #15130f;margin-top:4px;padding-top:3px}
+.v24 .screen{font-family:"Old Standard TT",serif;font-weight:700;font-size:28px;letter-spacing:.3em;border:1px solid #15130f}
+.v24 .keys{gap:0;border:1px solid #15130f}
+.v24 .keys button{font-family:"Old Standard TT",serif;font-weight:700;font-size:24px;border:1px solid #15130f;margin:-.5px}
+.v24 .keys button:hover{background:#15130f;color:#e9e2d0}
+.v24 .keys button.fn{font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+.v24 .msg{font-family:"Old Standard TT",serif;font-style:italic}
+.v24.is-ok .msg{color:#2d5a1e}.v24.is-bad .msg{color:#8e1a0c}
+
+/* ===== 25 Coffre du marchand ===== */
+.v25{background:
+  repeating-linear-gradient(45deg, rgba(0,0,0,.12) 0 2px, transparent 2px 6px),
+  radial-gradient(ellipse at center,#7b1a22,#3c0a0f 80%);
+  border-radius:8px;box-shadow:0 0 0 4px #c89a3c,0 0 0 6px #4b3210,0 20px 40px rgba(0,0,0,.7);color:#f6dc95}
+.v25 .kp-title{font-family:"Cinzel",serif;font-weight:700;font-size:15px;letter-spacing:.25em;color:#f0cf74}
+.v25 .screen{font-family:"Cinzel",serif;font-weight:700;font-size:26px;letter-spacing:.35em;color:#f0cf74;border-top:1px solid #c89a3c;border-bottom:1px solid #c89a3c}
+.v25 .keys button{font-family:"Cinzel",serif;font-weight:700;font-size:22px;border-radius:50%;color:#5a3a06;background:radial-gradient(circle at 50% 50%,transparent 0 60%,rgba(90,58,6,.4) 61% 63%,transparent 64%),radial-gradient(circle at 35% 30%,#fff3c0,#e8bd4e 45%,#a37618 80%);box-shadow:0 4px 0 #5a3a06,0 6px 10px rgba(0,0,0,.6);text-shadow:0 1px 0 rgba(255,240,190,.6)}
+.v25 .keys button.fn{font-size:11px}
+.v25 .msg{font-family:"Cinzel",serif}
+
+footer.foot{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:14px;max-width:70ch}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">rsg_chest · interface du code</span>
+    <h1>25 serrures pour vos coffres</h1>
+    <p class="lede">Chaque clavier est cliquable. Choisissez le <b>numéro</b> de celui que vous voulez : il deviendra l'interface NUI qui remplace la fenêtre texte d'ox_lib, pour ouvrir, poser et changer le code des coffres.</p>
+    <span class="demo">Code de démonstration <code>1899</code></span>
+  </header>
+
+  <main class="grid" id="grid"></main>
+
+  <footer class="foot">Les couleurs, polices et textes du modèle choisi seront réglables dans la config. Dans le jeu, le clavier se fermera avec Échap et acceptera aussi les chiffres du clavier physique.</footer>
+</div>
+
+<script>
+const DEMO = '1899';
+const MORSE = ['-----','.----','..---','...--','....-','.....','-....','--...','---..','----.'];
+
+const V = [
+  {n:1,  name:'Laiton & noyer', desc:'Boutons de laiton sur panneau de noyer, écran ambré.', layout:'grid', mask:'•', title:'Coffre scellé', tags:['classique','laiton']},
+  {n:2,  name:'Cadran de coffre-fort', desc:'Chiffres en couronne autour d\'un cadran d\'acier.', layout:'ring', mask:'•', title:'', tags:['circulaire','acier']},
+  {n:3,  name:'Parchemin & encre', desc:'Feuille jaunie, chiffres à la plume, bords déchirés.', layout:'grid', mask:'✱', title:'Veuillez inscrire le code', tags:['papier','léger']},
+  {n:4,  name:'Fer forgé riveté', desc:'Plaque de fer brut, rivets aux coins, braise orange.', layout:'grid', mask:'✦', title:'SERRURE', tags:['robuste','sombre']},
+  {n:5,  name:'Cryptex à rouleaux', desc:'Quatre molettes de laiton à tourner une par une.', layout:'wheels', mask:'', title:'Molettes de laiton', tags:['molettes','sans écran']},
+  {n:6,  name:'Télégraphe laqué', desc:'Laque noire, filet doré, touches d\'émail blanc.', layout:'grid', mask:'*', title:'WESTERN TELEGRAPH', tags:['émail','élégant']},
+  {n:7,  name:'Machine à écrire', desc:'Touches rondes cerclées de chrome, papier ligné.', layout:'grid', mask:'X', title:'Remington N°2', tags:['mécanique','chrome']},
+  {n:8,  name:'Avis de recherche', desc:'Affiche WANTED clouée, tampon rouge pour valider.', layout:'grid', mask:'✕', title:'WANTED<small>ENTREZ LE CODE · RÉCOMPENSE</small>', okLabel:'OUVRIR', tags:['affiche','fort caractère']},
+  {n:9,  name:'Cadenas à combinaison', desc:'Gros cadenas d\'acier et molettes noires.', layout:'wheels', mask:'', title:'Cadenas', tags:['molettes','acier']},
+  {n:10, name:'Sceaux de cire', desc:'Chaque touche est un cachet de cire rouge.', layout:'grid', mask:'✠', title:'Le Sceau', tags:['cire','gothique']},
+  {n:11, name:'Carnet du shérif', desc:'Page lignée, étoile du shérif, écriture de machine.', layout:'grid', mask:'•', title:'Registre du bureau', tags:['papier','loi']},
+  {n:12, name:'Banque de Saint-Denis', desc:'Marbre vert et dorures, style guichet de banque.', layout:'grid', mask:'◆', title:'BANQUE<small>SAINT-DENIS · 1899</small>', tags:['luxe','vert & or']},
+  {n:13, name:'Cuir cousu', desc:'Panneau de cuir surpiqué, touches embossées.', layout:'grid', mask:'✱', title:'Sacoche', tags:['cuir','chaud']},
+  {n:14, name:'Os & corne', desc:'Touches d\'ivoire sur corne sombre, gravure fine.', layout:'grid', mask:'✦', title:'Coffret du trappeur', tags:['ivoire','sobre']},
+  {n:15, name:'Minimal RP', desc:'Verre sombre et points lumineux, lisible et moderne.', layout:'grid', mask:'slots', title:'Code du coffre', tags:['moderne','lisible']},
+  {n:16, name:'Jetons de poker', desc:'Tapis de saloon et jetons de couleur.', layout:'grid', mask:'♠', title:'Saloon', tags:['jeu','coloré']},
+  {n:17, name:'Cadran de montre', desc:'Émail blanc et boîtier d\'or, chiffres en couronne.', layout:'ring', mask:'•', title:'', tags:['circulaire','or']},
+  {n:18, name:'Pierre gravée', desc:'Chiffres taillés dans la roche, pour une cache.', layout:'grid', mask:'✕', title:'CACHE', tags:['pierre','brut']},
+  {n:19, name:'Touches de piano', desc:'Clavier de piano de saloon, chiffres sur l\'ivoire.', layout:'piano', mask:'♪', title:'Le piano du saloon', tags:['original','large']},
+  {n:20, name:'Lanterne de nuit', desc:'Chiffres qui brillent comme une flamme de lampe.', layout:'grid', mask:'✹', title:'À la lanterne', tags:['lumineux','nuit']},
+  {n:21, name:'Pyrogravure', desc:'Bois de pin, chiffres brûlés au fer.', layout:'grid', mask:'✱', title:'Malle du ranch', tags:['bois','rustique']},
+  {n:22, name:'Code morse', desc:'Chaque chiffre s\'affiche en morse sur le ruban.', layout:'grid', mask:'morse', title:'TÉLÉGRAMME CHIFFRÉ', tags:['morse','original']},
+  {n:23, name:'Cuivre vert-de-gris', desc:'Cuivre oxydé par le temps, écran vert d\'eau.', layout:'grid', mask:'•', title:'Coffre du bayou', tags:['patiné','cuivre']},
+  {n:24, name:'Journal de 1899', desc:'Colonnes de journal, cases comme des annonces.', layout:'grid', mask:'✕', title:'La Gazette de l\'Ouest<small><span>Vol. XII</span><span>Prix : 5 cents</span></small>', tags:['journal','noir & blanc']},
+  {n:25, name:'Coffre du marchand', desc:'Pièces d\'or sur velours rouge.', layout:'grid', mask:'◆', title:'Trésor du marchand', tags:['or','velours']},
+];
+
+function el(tag, cls, html){const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e;}
+
+function build(v){
+  const card = el('article','card');
+  const head = el('div','card-head');
+  head.append(el('span','num','N°'+String(v.n).padStart(2,'0')), el('h2',null,v.name), el('p',null,v.desc));
+  const stage = el('div','stage');
+  const kp = el('div','kp v'+v.n);
+  kp.setAttribute('role','group');
+  kp.setAttribute('aria-label','Clavier '+v.name);
+  let value = '';
+  let wheelVals = [0,0,0,0];
+  let timer;
+
+  if (v.title) kp.append(el('div','kp-title',v.title));
+  const screen = el('div','screen');
+  const msg = el('div','msg');
+  msg.setAttribute('aria-live','polite');
+
+  function render(){
+    if (v.mask === 'slots'){
+      screen.innerHTML='';
+      for(let i=0;i<Math.max(4,value.length);i++){const s=el('span','slot'+(i<value.length?' on':'')); screen.append(s);}
+    } else if (v.mask === 'morse'){
+      screen.textContent = value ? value.split('').map(d=>MORSE[+d].replace(/\./g,'·').replace(/-/g,'—')).join('  ') : '— · — ·';
+    } else {
+      const t = value ? v.mask.repeat(value.length) : '';
+      screen.textContent = t || ' ';
+      if (dial) dial.textContent = t || '····';
+    }
+  }
+  function flash(ok){
+    clearTimeout(timer);
+    kp.classList.remove('is-ok','is-bad'); void kp.offsetWidth;
+    kp.classList.add(ok?'is-ok':'is-bad');
+    msg.textContent = ok ? 'Le coffre s\'ouvre' : 'Code incorrect';
+    timer = setTimeout(()=>{kp.classList.remove('is-ok','is-bad'); msg.textContent=''}, 1600);
+  }
+  function press(k){
+    if (k==='C'){ value = value.slice(0,-1); }
+    else if (k==='OK'){ flash(value===DEMO); value=''; }
+    else if (value.length<8){ value += k; }
+    render();
+  }
+  function btn(label, key, cls){
+    const b = el('button', cls||'', label);
+    b.type='button';
+    b.setAttribute('aria-label', key==='C'?'Effacer':key==='OK'?'Valider':'Chiffre '+key);
+    b.addEventListener('click',()=>press(key));
+    return b;
+  }
+
+  let dial = null;
+  if (v.layout==='grid'){
+    kp.append(screen);
+    const keys = el('div','keys');
+    for (let i=1;i<=9;i++) keys.append(btn(String(i),String(i)));
+    keys.append(btn('Effacer','C','fn'), btn('0','0'), btn(v.okLabel||'OK','OK','fn ok'));
+    kp.append(keys);
+  } else if (v.layout==='piano'){
+    kp.append(screen);
+    const keys = el('div','keys k5');
+    [1,2,3,4,5,6,7,8,9,0].forEach(i=>keys.append(btn(String(i),String(i))));
+    const act = el('div','piano-actions');
+    act.append(btn('Effacer','C'), btn('Ouvrir','OK'));
+    kp.append(keys, act);
+  } else if (v.layout==='ring'){
+    const ring = el('div','ring');
+    for (let i=0;i<10;i++){
+      const a = (i/10)*Math.PI*2 - Math.PI/2;
+      const b = btn(String(i),String(i),'rk');
+      b.style.transform = `translate(${Math.cos(a)*92}px, ${Math.sin(a)*92}px)`;
+      ring.append(b);
+    }
+    const c = el('div','center');
+    c.append(btn('EFF.','C','ghost'), btn('OK','OK'));
+    ring.append(c);
+    dial = el('div','dial-screen','····');
+    ring.append(dial);
+    kp.append(ring);
+  } else if (v.layout==='wheels'){
+    const wheels = el('div','wheels');
+    wheelVals.forEach((_,i)=>{
+      const w = el('div','wheel');
+      const up = el('button','w-btn','▲'); up.type='button'; up.setAttribute('aria-label','Molette '+(i+1)+' plus');
+      const d = el('div','w-digit','0');
+      const dn = el('button','w-btn','▼'); dn.type='button'; dn.setAttribute('aria-label','Molette '+(i+1)+' moins');
+      up.onclick=()=>{wheelVals[i]=(wheelVals[i]+1)%10; d.textContent=wheelVals[i]};
+      dn.onclick=()=>{wheelVals[i]=(wheelVals[i]+9)%10; d.textContent=wheelVals[i]};
+      w.append(up,d,dn); wheels.append(w);
+    });
+    const act = el('div','wheels-actions');
+    const reset = el('button','ghost','Remettre'); reset.type='button';
+    reset.onclick=()=>{wheelVals=[0,0,0,0]; wheels.querySelectorAll('.w-digit').forEach(x=>x.textContent='0')};
+    const ok = el('button','','Ouvrir'); ok.type='button';
+    ok.onclick=()=>flash(wheelVals.join('')===DEMO);
+    act.append(reset, ok);
+    kp.append(wheels, act);
+  }
+  kp.append(msg);
+  render();
+  stage.append(kp);
+
+  const tags = el('div','tags');
+  v.tags.forEach(t=>tags.append(el('span','tag',t)));
+  card.append(head, stage, tags);
+  return card;
+}
+
+const grid = document.getElementById('grid');
+V.forEach(v=>grid.append(build(v)));
+</script>
