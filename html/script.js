@@ -24,6 +24,8 @@ const state = {
     deadline: 0,
     duration: 0,
     timer: null,
+    succeeded: false,
+    closeTimer: null,
 };
 
 function post(name, data = {}) {
@@ -35,6 +37,54 @@ function post(name, data = {}) {
 }
 
 const isLockpick = () => state.mode === 'lockpick';
+
+// ---------------------------------------------------------------- sons (synthétisés, aucun fichier)
+const Sound = {
+    ctx: null,
+    volume: 0.5,
+    get() {
+        if (this.volume <= 0) return null;
+        try {
+            if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if (this.ctx.state === 'suspended') this.ctx.resume();
+        } catch (e) { return null; }
+        return this.ctx;
+    },
+    noise(dur, freq, gain, when = 0) {
+        const ctx = this.get(); if (!ctx) return;
+        const t = ctx.currentTime + when;
+        const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+        const src = ctx.createBufferSource(); src.buffer = buf;
+        const filter = ctx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = freq; filter.Q.value = 2;
+        const g = ctx.createGain(); g.gain.value = gain * this.volume;
+        src.connect(filter).connect(g).connect(ctx.destination);
+        src.start(t);
+    },
+    tone(freq, dur, gain, type = 'sine', when = 0, endFreq) {
+        const ctx = this.get(); if (!ctx) return;
+        const t = ctx.currentTime + when;
+        const osc = ctx.createOscillator(); osc.type = type;
+        osc.frequency.setValueAtTime(freq, t);
+        if (endFreq) osc.frequency.exponentialRampToValueAtTime(endFreq, t + dur);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(gain * this.volume, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        osc.connect(g).connect(ctx.destination);
+        osc.start(t); osc.stop(t + dur + 0.02);
+    },
+    tick() { this.noise(0.025, 3200, 0.35); },
+    click(strong) { this.noise(0.03, strong ? 1800 : 2400, strong ? 0.9 : 0.45); if (strong) this.tone(900, 0.05, 0.12, 'square'); },
+    lock() { this.noise(0.06, 900, 0.7); this.tone(160, 0.12, 0.35, 'triangle', 0, 70); },
+    fail() { this.tone(110, 0.25, 0.5, 'sawtooth', 0, 45); this.noise(0.12, 500, 0.5); },
+    open() {
+        this.lock();
+        this.noise(0.25, 1400, 0.35, 0.12);
+        this.tone(1320, 0.7, 0.12, 'sine', 0.2);
+        this.tone(1980, 0.5, 0.06, 'sine', 0.22);
+    },
+};
 
 function buildWheels() {
     wheelsEl.innerHTML = '';
@@ -129,6 +179,8 @@ function nextUnlocked(from, dir = 1) {
 function turn(i, dir) {
     if (state.busy || state.locked[i]) return;
     state.digits[i] = (state.digits[i] + dir + 10) % 10;
+    const fb = feedback(i);
+    if (fb) Sound.click(fb === 'click-strong'); else Sound.tick();
     clearMsg();
     render();
 }
@@ -167,10 +219,10 @@ async function validate() {
     state.busy = false;
 
     if (res && res.ok) {
-        cryptex.classList.add('success');
-        showMsg(res.msg || '', 'ok');
+        succeed(res.msg || '');
         return;
     }
+    Sound.fail();
     shake();
     showMsg(res && res.msg ? res.msg : '', 'bad');
     state.values = [];
@@ -189,17 +241,19 @@ async function lockWheel() {
         if (state.locked.filter(Boolean).length === state.length) {
             state.busy = true;
             stopTimer();
-            cryptex.classList.add('success');
             render();
+            succeed('');
             post('lockpickSuccess');
             return;
         }
+        Sound.lock();
         setActive(nextUnlocked(i));
         return;
     }
 
     state.busy = true;
     const res = await post('lockpickFail');
+    Sound.fail();
     shake();
     showMsg(res && res.msg ? res.msg : '', 'bad');
     if (res && res.broken) {
@@ -216,6 +270,13 @@ async function lockWheel() {
     } else {
         render();
     }
+}
+
+function succeed(msg) {
+    state.succeeded = true;
+    cryptex.classList.add('success');
+    showMsg(msg, 'ok');
+    Sound.open();
 }
 
 function startTimer() {
@@ -249,8 +310,11 @@ function cancel() {
 }
 
 function open(data) {
+    clearTimeout(state.closeTimer);
     state.open = true;
     state.busy = false;
+    state.succeeded = false;
+    Sound.volume = typeof data.volume === 'number' ? data.volume : 0.5;
     state.mode = data.mode === 'lockpick' ? 'lockpick' : 'code';
     state.text = data.text || {};
     state.values = [];
@@ -281,7 +345,7 @@ function open(data) {
     $('timer-bar').style.transform = 'scaleX(1)';
     $('btn-cancel').setAttribute('aria-label', state.text.cancel || 'Annuler');
     $('help').textContent = isLockpick() ? (state.text.lockHelp || '') : (state.text.help || '');
-    cryptex.classList.remove('success', 'shake');
+    cryptex.classList.remove('success', 'shake', 'opening');
     showMsg('');
     buildWheels();
     app.classList.remove('hidden');
@@ -291,6 +355,13 @@ function open(data) {
 function close() {
     state.open = false;
     stopTimer();
+    clearTimeout(state.closeTimer);
+    if (state.succeeded && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        // le verrou coulisse et le couvercle s'ouvre avant de disparaître
+        cryptex.classList.add('opening');
+        state.closeTimer = setTimeout(() => app.classList.add('hidden'), 750);
+        return;
+    }
     app.classList.add('hidden');
 }
 

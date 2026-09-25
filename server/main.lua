@@ -8,13 +8,27 @@ local Searches = {}      -- [src] = { id, started, warrant }
 local Lockpicks = {}     -- [src] = { id, started, fails, wheels }
 local LockpickCooldown = {} -- [chestId] = os.time() de fin
 local Dynamites = {}     -- [chestId] = true pendant la mèche
+local ChestFails = {}    -- [chestId] = { count, first, lockUntil } (tous joueurs confondus)
 
 ---------------------------------------------------------------------
 -- Utilitaires
 ---------------------------------------------------------------------
 local function toVec(t) return vector3(t.x + 0.0, t.y + 0.0, t.z + 0.0) end
 
-local function HashCode(code)
+--- Sel aléatoire propre à chaque coffre.
+local function NewSalt()
+    local t = {}
+    for i = 1, 16 do t[i] = ('%x'):format(math.random(0, 15)) end
+    return table.concat(t)
+end
+
+--- SHA-256 calculé par MySQL/MariaDB : sel du coffre + sel du serveur + code.
+local function HashCode(code, salt)
+    return MySQL.scalar.await('SELECT SHA2(?, 256)', { ('%s:%s:%s'):format(salt, Config.Code.Salt, tostring(code)) })
+end
+
+--- Ancien format (avant la version 1.2), converti au premier bon code.
+local function LegacyHash(code)
     return tostring(GetHashKey(Config.Code.Salt .. ':' .. tostring(code)))
 end
 
@@ -72,6 +86,10 @@ local function IsLaw(Player)
     return P.AllowJobTypeLeo and job.type == 'leo'
 end
 
+local function IsAdmin(src)
+    return RSGCore.Functions.HasPermission(src, Config.Admin.Permission) or IsPlayerAceAllowed(src, 'command')
+end
+
 local function IsInBlacklistZone(coords)
     for _, zone in ipairs(Config.BlacklistZones) do
         if #(coords - zone.coords) <= zone.radius then return true end
@@ -109,16 +127,35 @@ local function ForEachPlayer(cb)
     end
 end
 
-local function IsStashEmpty(id)
-    local stash = StashId(id)
-    local ok, inv = pcall(function() return exports['rsg-inventory']:GetInventory(stash) end)
-    if ok and type(inv) == 'table' and inv.items then
-        return next(inv.items) == nil
+--- Contenu d'un stash : la version en mémoire de rsg-inventory si elle existe
+--- (la plus récente), sinon la base de données.
+--- @return table items, boolean isOpen
+local function GetStashItems(identifier)
+    local ok, inv = pcall(function() return exports['rsg-inventory']:GetInventory(identifier) end)
+    if ok and type(inv) == 'table' and type(inv.items) == 'table' then
+        return inv.items, inv.isOpen and true or false
     end
-    local row = MySQL.single.await('SELECT items FROM inventories WHERE identifier = ?', { stash })
-    if not row or not row.items then return true end
-    local items = json.decode(row.items) or {}
-    return next(items) == nil
+    local row = MySQL.single.await('SELECT items FROM inventories WHERE identifier = ?', { identifier })
+    local items = row and row.items and json.decode(row.items) or {}
+    return type(items) == 'table' and items or {}, false
+end
+
+local function CountItems(items)
+    local n = 0
+    for _, it in pairs(items) do
+        if type(it) == 'table' and it.name and (tonumber(it.amount) or 1) > 0 then n = n + 1 end
+    end
+    return n
+end
+
+local function IsStashEmpty(id)
+    local items = GetStashItems(StashId(id))
+    return CountItems(items) == 0
+end
+
+local function IsStashOpen(id)
+    local _, open = GetStashItems(StashId(id))
+    return open
 end
 
 local function DeleteStash(id)
@@ -210,6 +247,7 @@ local function Migrate()
             `shared` LONGTEXT DEFAULT NULL,
             `last_search` INT(11) NOT NULL DEFAULT 0,
             `broken_until` INT(11) NOT NULL DEFAULT 0,
+            `salt` VARCHAR(32) DEFAULT NULL,
             `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`), KEY `owner` (`owner`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -219,6 +257,7 @@ local function Migrate()
         '`shared` LONGTEXT DEFAULT NULL',
         '`last_search` INT(11) NOT NULL DEFAULT 0',
         '`broken_until` INT(11) NOT NULL DEFAULT 0',
+        '`salt` VARCHAR(32) DEFAULT NULL',
     }) do
         pcall(function() MySQL.query.await('ALTER TABLE `rsg_chests` ADD COLUMN IF NOT EXISTS ' .. col) end)
     end
@@ -232,6 +271,21 @@ local function Migrate()
             `action` VARCHAR(32) NOT NULL,
             `details` VARCHAR(255) DEFAULT NULL,
             `date` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`), KEY `chest_id` (`chest_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ]])
+    MySQL.query.await([[
+        CREATE TABLE IF NOT EXISTS `rsg_chests_evidence` (
+            `id` INT(11) NOT NULL AUTO_INCREMENT,
+            `chest_id` INT(11) NOT NULL,
+            `owner` VARCHAR(50) DEFAULT NULL,
+            `owner_name` VARCHAR(100) DEFAULT NULL,
+            `warrant_id` INT(11) DEFAULT NULL,
+            `seized_by` VARCHAR(50) DEFAULT NULL,
+            `seized_name` VARCHAR(100) DEFAULT NULL,
+            `job` VARCHAR(50) DEFAULT NULL,
+            `items` INT(11) NOT NULL DEFAULT 0,
+            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`), KEY `chest_id` (`chest_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ]])
@@ -368,27 +422,31 @@ lib.callback.register('rsg_chest:server:place', function(src, chestType, coords,
         if count >= Config.MaxChestsPerPlayer then return false, T.max_reached:format(Config.MaxChestsPerPlayer) end
     end
 
+    local salt = NewSalt()
+    local hash = HashCode(code, salt)
+    if not hash then return false, T.sql_error end
+
     if not HasItem(Player, cfg.item) or not RemoveItem(src, Player, cfg.item) then
         return false, T.no_item
     end
 
     local id = MySQL.insert.await([[
-        INSERT INTO rsg_chests (owner, owner_name, type, model, coords, rotation, code, slots, weight, shared)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')
+        INSERT INTO rsg_chests (owner, owner_name, type, model, coords, rotation, code, salt, slots, weight, shared)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')
     ]], {
         citizenid, CharName(Player), chestType, cfg.model,
         json.encode({ x = pos.x, y = pos.y, z = pos.z }),
         json.encode({ x = rotation.x, y = rotation.y, z = rotation.z }),
-        HashCode(code), cfg.slots, cfg.weight,
+        hash, salt, cfg.slots, cfg.weight,
     })
     if not id then
         AddItem(src, Player, cfg.item)
-        return false, 'Erreur SQL'
+        return false, T.sql_error
     end
 
     local chest = {
         id = id, owner = citizenid, owner_name = CharName(Player), type = chestType, model = cfg.model,
-        coords = pos, rot = rotation, code = HashCode(code), slots = cfg.slots, weight = cfg.weight,
+        coords = pos, rot = rotation, code = hash, salt = salt, slots = cfg.slots, weight = cfg.weight,
         shared = {}, last_search = 0, broken_until = 0,
     }
     Chests[id] = chest
@@ -429,6 +487,7 @@ lib.callback.register('rsg_chest:server:getChestInfo', function(src, id)
         canLockpick = Config.Lockpick.Enabled and (not law or Config.Lockpick.LawCanLockpick) and not isOwner,
         canDynamite = Config.Dynamite.Enabled and (not law or Config.Dynamite.LawCanUse) and not isOwner,
         ownerName = law and (c.owner_name or c.owner) or nil,
+        evidence = Config.Evidence.Enabled,
     }
     if isOwner and Config.Sharing.Enabled then
         info.shared = c.shared
@@ -443,19 +502,62 @@ end)
 ---------------------------------------------------------------------
 -- Code
 ---------------------------------------------------------------------
+local function CodeMatches(c, code)
+    if type(code) ~= 'string' or code == '' then return false end
+    if c.salt and c.salt ~= '' then
+        return HashCode(code, c.salt) == c.code
+    end
+    if LegacyHash(code) ~= c.code then return false end
+    -- conversion vers SHA-256 salé
+    c.salt = NewSalt()
+    c.code = HashCode(code, c.salt)
+    MySQL.update('UPDATE rsg_chests SET code = ?, salt = ? WHERE id = ?', { c.code, c.salt, c.id })
+    return true
+end
+
+local function SetCode(c, code)
+    local salt = NewSalt()
+    local hash = HashCode(code, salt)
+    if not hash then return false end
+    c.salt, c.code = salt, hash
+    MySQL.update.await('UPDATE rsg_chests SET code = ?, salt = ? WHERE id = ?', { hash, salt, c.id })
+    return true
+end
+
+--- Blocage du coffre entier après trop d'échecs, tous joueurs confondus
+--- (empêche de contourner la limite avec plusieurs personnages).
+local function ChestFailed(c)
+    local C = Config.Code
+    local now = os.time()
+    local f = ChestFails[c.id]
+    if not f or now - f.first > C.ChestFailWindow then f = { count = 0, first = now } end
+    f.count = f.count + 1
+    if f.count >= C.ChestMaxFails then
+        f.lockUntil = now + C.ChestLockTime
+        NotifyOwner(c, T.fail_owner:format(c.id))
+    end
+    ChestFails[c.id] = f
+end
+
 local function CheckCode(Player, c, code)
+    local now = os.time()
+    local cf = ChestFails[c.id]
+    if cf and cf.lockUntil and cf.lockUntil > now then
+        return false, T.chest_locked:format(math.ceil((cf.lockUntil - now) / 60))
+    end
+
     local key = Player.PlayerData.citizenid .. ':' .. c.id
     local att = Attempts[key]
-    local now = os.time()
     if att and att.lockUntil and att.lockUntil > now then
         return false, T.locked:format(att.lockUntil - now)
     end
 
-    if type(code) == 'string' and HashCode(code) == c.code then
+    if CodeMatches(c, code) then
         Attempts[key] = nil
         return true
     end
 
+    ChestFailed(c)
     att = att or { count = 0 }
     if att.lockUntil and att.lockUntil <= now then att = { count = 0 } end
     att.count = att.count + 1
@@ -498,8 +600,7 @@ lib.callback.register('rsg_chest:server:changeCode', function(src, id, oldCode, 
     if not ValidCode(newCode) then return false, InvalidCodeMsg() end
     local ok, msg = CheckCode(Player, c, oldCode)
     if not ok then return false, msg end
-    c.code = HashCode(newCode)
-    MySQL.update.await('UPDATE rsg_chests SET code = ? WHERE id = ?', { c.code, c.id })
+    if not SetCode(c, newCode) then return false, T.sql_error end
     Log(c.id, Player, 'change_code')
     return true, T.code_changed
 end)
@@ -510,6 +611,7 @@ lib.callback.register('rsg_chest:server:pickup', function(src, id, code)
     if c.owner ~= Player.PlayerData.citizenid then return false, T.not_owner end
     local ok, msg = CheckCode(Player, c, code)
     if not ok then return false, msg end
+    if IsStashOpen(c.id) then return false, T.stash_in_use end
     if Config.PickupRequireEmpty and not IsStashEmpty(c.id) then return false, T.not_empty end
 
     local cfg = Config.Chests[c.type]
@@ -632,7 +734,7 @@ lib.callback.register('rsg_chest:server:issueWarrant', function(src, data)
         INSERT INTO rsg_chests_warrants (target_type, target, target_name, reason, issued_by, issued_name, job, expires_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ]], { targetType, target, targetName, reason, Player.PlayerData.citizenid, CharName(Player), Player.PlayerData.job.name, expires })
-    if not id then return false, 'Erreur SQL' end
+    if not id then return false, T.sql_error end
 
     Warrants[id] = {
         id = id, target_type = targetType, target = target, target_name = targetName, reason = reason,
@@ -724,6 +826,34 @@ lib.callback.register('rsg_chest:server:searchFinish', function(src, id)
     return true
 end)
 
+---------------------------------------------------------------------
+-- Scellés : le contenu saisi est déplacé, jamais perdu
+---------------------------------------------------------------------
+local function EvidenceStash(eid) return 'rsgchest_evidence_' .. eid end
+
+local function MoveToEvidence(c, Player, warrant)
+    local items = GetStashItems(StashId(c.id))
+    local count = CountItems(items)
+    if count == 0 then return nil end
+
+    local eid = MySQL.insert.await([[
+        INSERT INTO rsg_chests_evidence (chest_id, owner, owner_name, warrant_id, seized_by, seized_name, job, items)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ]], { c.id, c.owner, c.owner_name, warrant and warrant.id, Player.PlayerData.citizenid, CharName(Player),
+        Player.PlayerData.job.name, count })
+    if not eid then return false end
+
+    local ok = MySQL.insert.await([[
+        INSERT INTO inventories (identifier, items) VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE items = VALUES(items)
+    ]], { EvidenceStash(eid), json.encode(items) })
+    if ok == nil then
+        MySQL.query.await('DELETE FROM rsg_chests_evidence WHERE id = ?', { eid })
+        return false
+    end
+    return eid
+end
+
 lib.callback.register('rsg_chest:server:seize', function(src, id)
     local Player, c, err = GetContext(src, id)
     if not Player then return false, err end
@@ -731,24 +861,68 @@ lib.callback.register('rsg_chest:server:seize', function(src, id)
     if not P.CanSeize or not IsLaw(Player) or Grade(Player) < P.SeizeMinGrade then return false, T.not_allowed end
     local warrant = ActiveWarrant(c)
     if Config.Warrant.SeizeRequiresWarrant and not warrant then return false, T.no_warrant end
+    if IsStashOpen(c.id) then return false, T.stash_in_use end
     local empty = IsStashEmpty(c.id)
     if P.SeizeRequireEmpty and not empty then return false, T.not_empty end
 
+    local eid
+    if not empty and Config.Evidence.Enabled then
+        eid = MoveToEvidence(c, Player, warrant)
+        -- en cas d'échec on ne supprime rien : aucun objet ne doit disparaître
+        if eid == false then return false, T.sql_error end
+    end
+
     local cfg = Config.Chests[c.type]
     if warrant then UseWarrant(warrant) end
+    local contents = empty and 'vide' or (eid and ('scellé #%d'):format(eid) or 'détruit')
     Log(c.id, Player, 'seize', ('propriétaire : %s | contenu %s | %s'):format(c.owner_name or c.owner,
-        empty and 'vide' or 'détruit', warrant and ('mandat #%d'):format(warrant.id) or 'sans mandat'))
+        contents, warrant and ('mandat #%d'):format(warrant.id) or 'sans mandat'))
     NotifyOwner(c, T.searched_owner:format(c.id))
     RemoveChest(c.id)
     if P.SeizeGiveItem and cfg then AddItem(src, Player, cfg.item) end
-    return true, T.seized
+    return true, eid and T.evidence_saved:format(eid) or T.seized
+end)
+
+local function AtEvidenceLocation(src)
+    local locs = Config.Evidence.Locations
+    if not locs or #locs == 0 then return true end
+    for _, l in ipairs(locs) do
+        if IsNear(src, l.coords, l.radius or 5.0) then return true end
+    end
+    return false
+end
+
+lib.callback.register('rsg_chest:server:getEvidence', function(src)
+    local Player = RSGCore.Functions.GetPlayer(src)
+    if not Player or not IsLaw(Player) or Grade(Player) < Config.Evidence.MinGrade then return nil, T.not_allowed end
+    if not AtEvidenceLocation(src) then return nil, T.evidence_not_here end
+    return MySQL.query.await([[
+        SELECT id, chest_id, owner_name, seized_name, warrant_id, items, DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS date
+        FROM rsg_chests_evidence ORDER BY id DESC LIMIT ?
+    ]], { Config.Evidence.ListLimit }) or {}
+end)
+
+lib.callback.register('rsg_chest:server:openEvidence', function(src, eid)
+    local Player = RSGCore.Functions.GetPlayer(src)
+    eid = tonumber(eid)
+    if not Player or not eid or not IsLaw(Player) or Grade(Player) < Config.Evidence.MinGrade then return false, T.not_allowed end
+    if not AtEvidenceLocation(src) then return false, T.evidence_not_here end
+    local row = MySQL.single.await('SELECT id, chest_id FROM rsg_chests_evidence WHERE id = ?', { eid })
+    if not row then return false, T.evidence_empty end
+    Log(row.chest_id, Player, 'evidence_open', ('scellé #%d'):format(eid))
+    exports['rsg-inventory']:OpenInventory(src, EvidenceStash(eid), {
+        label = T.evidence_label:format(eid),
+        maxweight = Config.Evidence.Weight,
+        slots = Config.Evidence.Slots,
+    })
+    return true
 end)
 
 lib.callback.register('rsg_chest:server:getLogs', function(src, id)
     local Player = RSGCore.Functions.GetPlayer(src)
     local c = Chests[tonumber(id)]
     if not Player or not c then return nil end
-    if c.owner ~= Player.PlayerData.citizenid and not IsLaw(Player) then return nil end
+    if c.owner ~= Player.PlayerData.citizenid and not IsLaw(Player) and not IsAdmin(src) then return nil end
     return MySQL.query.await([[
         SELECT action, name, job, details, DATE_FORMAT(date, '%d/%m/%Y %H:%i') AS date
         FROM rsg_chests_logs WHERE chest_id = ? ORDER BY id DESC LIMIT ?
@@ -952,18 +1126,53 @@ AddEventHandler('playerDropped', function()
 end)
 
 ---------------------------------------------------------------------
--- Commandes admin
+-- Admin
 ---------------------------------------------------------------------
-RSGCore.Commands.Add('chestdelete', 'Supprimer un coffre (rsg_chest)', { { name = 'id', help = 'ID du coffre' } }, true,
+lib.callback.register('rsg_chest:server:adminList', function(src)
+    if not IsAdmin(src) then return nil end
+    local list = {}
+    for _, c in pairs(Chests) do
+        list[#list + 1] = {
+            id = c.id, type = c.type, owner = c.owner_name or c.owner,
+            coords = { x = c.coords.x, y = c.coords.y, z = c.coords.z },
+            broken = IsBroken(c), shared = #c.shared,
+        }
+    end
+    return list
+end)
+
+lib.callback.register('rsg_chest:server:adminOpen', function(src, id)
+    if not IsAdmin(src) then return false, T.not_allowed end
+    local c = Chests[tonumber(id)]
+    if not c then return false, T.admin_not_found end
+    Log(c.id, RSGCore.Functions.GetPlayer(src), 'admin_open')
+    OpenStash(src, c)
+    return true
+end)
+
+lib.callback.register('rsg_chest:server:adminDelete', function(src, id)
+    if not IsAdmin(src) then return false, T.not_allowed end
+    id = tonumber(id)
+    if not id or not Chests[id] then return false, T.admin_not_found end
+    Log(id, RSGCore.Functions.GetPlayer(src), 'admin_delete')
+    RemoveChest(id)
+    return true, T.admin_deleted:format(id)
+end)
+
+RSGCore.Commands.Add('chestadmin', T.cmd_admin, {}, false, function(source)
+    TriggerClientEvent('rsg_chest:client:adminMenu', source)
+end, Config.Admin.Permission)
+
+RSGCore.Commands.Add('chestdelete', T.cmd_delete, { { name = 'id', help = T.cmd_delete_arg } }, true,
     function(source, args)
         local id = tonumber(args[1])
-        if not id or not Chests[id] then return Notify(source, 'Coffre introuvable', 'error') end
-        RemoveChest(id)
+        if not id or not Chests[id] then return Notify(source, T.admin_not_found, 'error') end
         Log(id, RSGCore.Functions.GetPlayer(source), 'admin_delete')
-        Notify(source, ('Coffre #%d supprimé'):format(id), 'success')
-    end, 'admin')
+        RemoveChest(id)
+        Notify(source, T.admin_deleted:format(id), 'success')
+    end, Config.Admin.Permission)
 
-RSGCore.Commands.Add('chestnearest', 'Afficher l\'ID du coffre le plus proche', {}, false, function(source)
+RSGCore.Commands.Add('chestnearest', T.cmd_nearest, {}, false, function(source)
     local pos = PedCoords(source)
     if not pos then return end
     local best, bestDist
@@ -971,11 +1180,11 @@ RSGCore.Commands.Add('chestnearest', 'Afficher l\'ID du coffre le plus proche', 
         local d = #(c.coords - pos)
         if not bestDist or d < bestDist then best, bestDist = c, d end
     end
-    if not best then return Notify(source, 'Aucun coffre', 'error') end
-    Notify(source, ('Coffre #%d (%s) — propriétaire %s — %.1fm'):format(best.id, best.type, best.owner_name or best.owner, bestDist))
-end, 'admin')
+    if not best then return Notify(source, T.admin_none, 'error') end
+    Notify(source, T.admin_nearest:format(best.id, best.type, best.owner_name or best.owner, bestDist))
+end, Config.Admin.Permission)
 
-RSGCore.Commands.Add('chestclean', 'Supprimer les coffres abandonnés maintenant', {}, false, function(source)
+RSGCore.Commands.Add('chestclean', T.cmd_clean, {}, false, function(source)
     CleanAbandoned()
-    Notify(source, 'Nettoyage effectué', 'success')
-end, 'admin')
+    Notify(source, T.admin_clean_done, 'success')
+end, Config.Admin.Permission)

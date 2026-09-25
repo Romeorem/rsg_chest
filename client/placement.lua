@@ -34,7 +34,7 @@ function IsInBlacklistZone(coords)
 end
 
 local function IsTooCloseToChest(coords)
-    for _, chest in pairs(GetLoadedChests()) do
+    for _, chest in ipairs(GetChestsNear(coords)) do
         if #(coords - chest.coords) < Config.MinDistanceBetween then return true end
     end
     return false

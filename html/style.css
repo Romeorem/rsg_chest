@@ -1,3 +1,16 @@
+@font-face {
+    font-family: 'Cinzel';
+    font-weight: 500;
+    font-style: normal;
+    src: url('fonts/cinzel-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Cinzel';
+    font-weight: 700;
+    font-style: normal;
+    src: url('fonts/cinzel-latin-700-normal.woff2') format('woff2');
+}
+
 :root {
     --brass-dark: #6f5220;
     --brass: #e6c26d;
@@ -179,6 +192,37 @@ html, body {
     max-width: 360px;
 }
 
+/* ===== verrou & ouverture ===== */
+.bolt-track {
+    width: 190px;
+    height: 12px;
+    margin-top: -6px;
+    border-radius: 6px;
+    background: var(--pit);
+    box-shadow: inset 0 2px 5px #000;
+    overflow: hidden;
+}
+.bolt {
+    width: 62%;
+    height: 100%;
+    border-radius: 6px;
+    background: linear-gradient(180deg, var(--brass-light), var(--brass) 45%, var(--brass-dark));
+    transition: transform .35s cubic-bezier(.5, 0, .3, 1);
+}
+.cryptex.opening .bolt { transform: translateX(62%); }
+.cryptex.opening .wheels { animation: glow .5s ease-out forwards; }
+.cryptex.opening { animation: open-lid .75s ease-in forwards; }
+
+@keyframes glow {
+    0% { box-shadow: inset 0 4px 14px #000; }
+    100% { box-shadow: inset 0 4px 14px #000, 0 0 26px rgba(255, 220, 140, .55); }
+}
+@keyframes open-lid {
+    0%, 45% { transform: translateY(0) scale(1); opacity: 1; }
+    60% { transform: translateY(-6px) scale(1.02); opacity: 1; }
+    100% { transform: translateY(10px) scale(.94); opacity: 0; }
+}
+
 /* ===== crochetage ===== */
 .timer {
     width: 100%;
@@ -235,4 +279,6 @@ button:focus-visible { outline: 2px solid var(--brass-light); outline-offset: 2p
     .strip, #app, .cryptex { transition: none; }
     .cryptex.shake { animation: none; }
     .window.click-weak .strip, .window.click-strong .strip { animation: none; }
+    .cryptex.opening, .cryptex.opening .wheels { animation: none; }
+    .bolt { transition: none; }
 }

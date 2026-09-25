@@ -6,11 +6,13 @@ lua54 'yes'
 name 'rsg_chest'
 author 'romeorem'
 description 'Coffres à code posables (placement gizmo) + perquisition pour les forces de l\'ordre - RSG Core'
-version '1.0.0'
+version '1.2.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
     'config.lua',
+    'locales/*.lua',
+    'shared/locale.lua',
 }
 
 client_scripts {
@@ -30,6 +32,7 @@ files {
     'html/index.html',
     'html/style.css',
     'html/script.js',
+    'html/fonts/*.woff2',
 }
 
 dependencies {

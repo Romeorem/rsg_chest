@@ -9,7 +9,10 @@ Coffres posables avec **code secret**, placement type **gizmo**, sauvegarde **SQ
 - Interface **cryptex à molettes** en HTML (modèle N°05) pour poser, ouvrir, ramasser et changer le code
   - molette de la souris ou `▲▼` pour tourner, chiffres du clavier pour saisir, `←→` pour changer de molette, `Entrée` valider, `Échap` annuler
   - nombre de molettes = `Config.Code.Length` (4 par défaut) ; `Config.Code.UseNui = false` pour revenir à la fenêtre ox_lib
-- Code défini à la pose (haché côté serveur, jamais envoyé au client)
+- Code défini à la pose : SHA-256 avec un sel propre à chaque coffre, jamais envoyé au client
+  (les coffres créés avant la mise à jour sont convertis automatiquement au premier bon code)
+- Anti-bruteforce par joueur **et** par coffre (10 échecs en 10 min, tous personnages confondus → coffre bloqué 15 min)
+- Sons de cliquetis générés par le navigateur (aucun fichier audio), animation d'ouverture, police Cinzel embarquée (licence OFL dans `html/fonts/`)
 - Anti-bruteforce : X essais puis serrure bloquée, propriétaire prévenu
 - Propriétaire : changer le code, ramasser le coffre (vide), voir l'historique
 - Forces de l'ordre (jobs + grade configurables, en service) :
@@ -24,9 +27,14 @@ Coffres posables avec **code secret**, placement type **gizmo**, sauvegarde **SQ
   Sans mandat valide, pas de fouille ni de saisie. `/mandat` pour en délivrer, `/mandats` pour la liste et la révocation.
 - **Règles de perquisition** : nombre minimum d'agents en service à proximité, délai entre deux fouilles d'un même coffre
 - **Coffres abandonnés** : supprimés automatiquement si le propriétaire ne s'est pas connecté depuis X jours (`/chestclean` pour lancer à la main)
+- **Scellés** : une saisie ne détruit plus rien. Le contenu part dans un scellé numéroté (`/scelles`), consultable par la loi,
+  éventuellement seulement au bureau du shérif (`Config.Evidence.Locations`)
+- **Menu admin** `/chestadmin` : coffres triés par distance, téléportation, ouverture, historique, suppression
+- **Langues** : `Config.Locale = 'fr'` ou `'en'` (fichiers dans `locales/`)
+- Carte découpée en zones : seuls les coffres autour du joueur sont parcourus, même avec des milliers de coffres
 - Logs SQL + webhook Discord optionnel
 - Interaction via prompt natif RedM ou `rsg-target` / `ox_target`
-- Commandes admin : `/chestnearest`, `/chestdelete [id]`, `/chestclean`
+- Commandes admin : `/chestadmin`, `/chestnearest`, `/chestdelete [id]`, `/chestclean`
 - Alertes : zone approximative sur la carte + notification pour tous les agents en service. `Config.Alerts.ServerEvent` pour brancher votre propre dispatch.
 
 ## Dépendances

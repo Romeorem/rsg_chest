@@ -58,6 +58,7 @@ function RequestCode(opts)
     return OpenNui({
         action = 'open', mode = 'code',
         title = opts.title, steps = opts.steps, length = Config.Code.Length, text = NuiText(),
+        volume = Config.Code.SoundVolume,
     }, { onSubmit = opts.onSubmit })
 end
 
@@ -81,6 +82,7 @@ function RequestLockpick(opts)
     return OpenNui({
         action = 'open', mode = 'lockpick',
         title = opts.title, digits = opts.digits, time = opts.time, text = NuiText(),
+        volume = Config.Code.SoundVolume,
     }, { onFail = opts.onFail })
 end
 
@@ -109,7 +111,7 @@ end)
 
 RegisterNUICallback('lockpickSuccess', function(_, cb)
     cb({})
-    SetTimeout(500, function() Finish('success') end)
+    SetTimeout(150, function() Finish('success') end)
 end)
 
 RegisterNUICallback('lockpickTimeout', function(_, cb)

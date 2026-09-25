@@ -5,7 +5,45 @@ local Chests = {}      -- [id] = { id, type, model, coords, rot, owner, label, e
 local PlayerData = {}
 local Loaded = false
 
-function GetLoadedChests() return Chests end
+-- Découpage de la carte en zones : on ne parcourt que les coffres des 9 zones
+-- autour du joueur, même avec des milliers de coffres sur le serveur.
+local CELL = math.max(Config.SpawnDistance, 50.0)
+local Grid = {}        -- ["x:y"] = { [id] = true }
+local Spawned = {}     -- [id] = chest (props affichés)
+
+local function CellKey(x, y) return math.floor(x / CELL) .. ':' .. math.floor(y / CELL) end
+
+local function GridAdd(chest)
+    local key = CellKey(chest.coords.x, chest.coords.y)
+    Grid[key] = Grid[key] or {}
+    Grid[key][chest.id] = true
+    chest.cell = key
+end
+
+local function GridRemove(chest)
+    local cell = chest.cell and Grid[chest.cell]
+    if cell then
+        cell[chest.id] = nil
+        if next(cell) == nil then Grid[chest.cell] = nil end
+    end
+end
+
+--- Coffres des zones voisines d'une position (placement, spawn).
+function GetChestsNear(pos)
+    local list = {}
+    local cx, cy = math.floor(pos.x / CELL), math.floor(pos.y / CELL)
+    for dx = -1, 1 do
+        for dy = -1, 1 do
+            local cell = Grid[(cx + dx) .. ':' .. (cy + dy)]
+            if cell then
+                for id in pairs(cell) do
+                    if Chests[id] then list[#list + 1] = Chests[id] end
+                end
+            end
+        end
+    end
+    return list
+end
 
 ---------------------------------------------------------------------
 -- Utilitaires
@@ -45,6 +83,7 @@ local function SpawnChest(chest)
     local hash = GetHashKey(chest.model)
     if not IsModelInCdimage(hash) then
         print(('[rsg_chest] ^1Modèle introuvable : %s (coffre #%d)^7'):format(chest.model, chest.id))
+        chest.invalid = true
         return
     end
     lib.requestModel(hash, 5000)
@@ -55,6 +94,7 @@ local function SpawnChest(chest)
     SetEntityInvincible(obj, true)
     SetModelAsNoLongerNeeded(hash)
     chest.entity = obj
+    Spawned[chest.id] = chest
     AddTarget(chest)
 end
 
@@ -63,21 +103,24 @@ local function DespawnChest(chest)
         DeleteEntity(chest.entity)
     end
     chest.entity = nil
+    Spawned[chest.id] = nil
 end
 
 local function RegisterChest(data)
     local chest = {
         id = data.id, type = data.type, model = data.model, owner = data.owner,
         coords = toVec(data.coords), rot = toVec(data.rot),
-        label = (Config.Chests[data.type] and Config.Chests[data.type].label or 'Coffre') .. ' #' .. data.id,
+        label = (Config.Chests[data.type] and Config.Chests[data.type].label or T.chest_default) .. ' #' .. data.id,
     }
-    if Chests[chest.id] then DespawnChest(Chests[chest.id]) end
+    local old = Chests[chest.id]
+    if old then DespawnChest(old); GridRemove(old) end
     Chests[chest.id] = chest
+    GridAdd(chest)
 end
 
 local function LoadChests()
     for _, c in pairs(Chests) do DespawnChest(c) end
-    Chests = {}
+    Chests, Grid, Spawned = {}, {}, {}
     local list = lib.callback.await('rsg_chest:server:getChests', false) or {}
     for _, data in ipairs(list) do RegisterChest(data) end
     Loaded = true
@@ -87,13 +130,13 @@ CreateThread(function()
     while true do
         if Loaded then
             local pos = GetEntityCoords(PlayerPedId())
-            for _, chest in pairs(Chests) do
-                local dist = #(pos - chest.coords)
-                if dist < Config.SpawnDistance and not chest.entity then
+            for _, chest in ipairs(GetChestsNear(pos)) do
+                if not chest.entity and not chest.invalid and #(pos - chest.coords) < Config.SpawnDistance then
                     SpawnChest(chest)
-                elseif dist >= Config.SpawnDistance and chest.entity then
-                    DespawnChest(chest)
                 end
+            end
+            for _, chest in pairs(Spawned) do
+                if #(pos - chest.coords) >= Config.SpawnDistance then DespawnChest(chest) end
             end
         end
         Wait(1000)
@@ -103,8 +146,10 @@ end)
 RegisterNetEvent('rsg_chest:client:addChest', function(data) RegisterChest(data) end)
 
 RegisterNetEvent('rsg_chest:client:removeChest', function(id)
-    if Chests[id] then
-        DespawnChest(Chests[id])
+    local chest = Chests[id]
+    if chest then
+        DespawnChest(chest)
+        GridRemove(chest)
         Chests[id] = nil
     end
 end)
@@ -236,9 +281,10 @@ local function Search(id)
     if not ok then Notify(false, msg) end
 end
 
-local function Seize(id)
+local function Seize(id, evidence)
     local answer = lib.alertDialog({
-        header = T.seize_confirm, content = T.seize_confirm_d, centered = true, cancel = true,
+        header = T.seize_confirm, content = evidence and T.seize_confirm_d or T.seize_confirm_destroy,
+        centered = true, cancel = true,
     })
     if answer ~= 'confirm' then return end
     Notify(lib.callback.await('rsg_chest:server:seize', false, id))
@@ -250,7 +296,7 @@ local function ShowLogs(id)
     local options = {}
     for _, log in ipairs(logs) do
         options[#options + 1] = {
-            title = ('%s — %s'):format(log.action, log.name or 'Système'),
+            title = ('%s — %s'):format(log.action, log.name or T.system),
             description = ('%s%s%s'):format(log.date or '', log.job and (' | ' .. log.job) or '',
                 log.details and (' | ' .. log.details) or ''),
             readOnly = true,
@@ -277,7 +323,7 @@ local function AddNearbyPlayer(id)
     local options = {}
     for _, p in ipairs(names) do
         options[#options + 1] = {
-            title = p.name, description = ('ID %d'):format(p.id), icon = 'user-plus',
+            title = p.name, description = T.player_id:format(p.id), icon = 'user-plus',
             onSelect = function()
                 Notify(lib.callback.await('rsg_chest:server:shareAddPlayer', false, id, p.id))
                 ShowAccess(id)
@@ -357,7 +403,7 @@ local function ShowWarrants()
         local hours = math.floor(w.minutes / 60)
         options[#options + 1] = {
             title = ('#%d — %s'):format(w.id, w.target_name or '?'),
-            description = ('%s | %s | %dh%02d restantes | %d fouille(s)'):format(
+            description = T.warrant_desc:format(
                 w.reason or '', w.issued_name or '', hours, w.minutes % 60, w.uses or 0),
             icon = 'file-signature',
             readOnly = not canRevoke,
@@ -376,6 +422,8 @@ end
 
 RegisterCommand('mandat', function() IssueWarrant(nil) end, false)
 RegisterCommand('mandats', function() ShowWarrants() end, false)
+TriggerEvent('chat:addSuggestion', '/mandat', T.warrant_title)
+TriggerEvent('chat:addSuggestion', '/mandats', T.warrant_list)
 
 ---------------------------------------------------------------------
 -- Crochetage & dynamite
@@ -446,6 +494,85 @@ RegisterNetEvent('rsg_chest:client:lawAlert', function(c, message)
 end)
 
 ---------------------------------------------------------------------
+-- Scellés (pièces à conviction)
+---------------------------------------------------------------------
+local function ShowEvidence()
+    local list, err = lib.callback.await('rsg_chest:server:getEvidence', false)
+    if not list then return Notify(false, err or T.not_allowed) end
+    local options = {}
+    for _, e in ipairs(list) do
+        options[#options + 1] = {
+            title = T.evidence_label:format(e.id),
+            description = T.evidence_desc:format(e.chest_id, e.owner_name or '?', e.seized_name or '?', e.date or ''),
+            icon = 'box-archive',
+            onSelect = function()
+                local ok, msg = lib.callback.await('rsg_chest:server:openEvidence', false, e.id)
+                if not ok then Notify(false, msg) end
+            end,
+        }
+    end
+    if #options == 0 then options[1] = { title = T.evidence_empty, readOnly = true } end
+    lib.registerContext({ id = 'rsg_chest_evidence', title = T.evidence_title, options = options })
+    lib.showContext('rsg_chest_evidence')
+end
+
+RegisterCommand('scelles', ShowEvidence, false)
+TriggerEvent('chat:addSuggestion', '/scelles', T.cmd_evidence)
+
+---------------------------------------------------------------------
+-- Admin
+---------------------------------------------------------------------
+local function AdminChest(c)
+    lib.registerContext({
+        id = 'rsg_chest_admin_one', title = T.admin_entry:format(c.id, c.type, c.owner), menu = 'rsg_chest_admin',
+        options = {
+            { title = T.admin_tp, icon = 'location-dot', onSelect = function()
+                local ped = PlayerPedId()
+                SetEntityCoords(ped, c.coords.x, c.coords.y, c.coords.z + 1.0, false, false, false, false)
+            end },
+            { title = T.admin_open, icon = 'box-open', onSelect = function()
+                local ok, msg = lib.callback.await('rsg_chest:server:adminOpen', false, c.id)
+                if not ok then Notify(false, msg) end
+            end },
+            { title = T.menu_logs, icon = 'list', onSelect = function() ShowLogs(c.id) end },
+            { title = T.admin_delete, icon = 'trash', onSelect = function()
+                local answer = lib.alertDialog({ header = T.admin_delete_confirm:format(c.id), centered = true, cancel = true })
+                if answer == 'confirm' then
+                    Notify(lib.callback.await('rsg_chest:server:adminDelete', false, c.id))
+                end
+            end },
+        },
+    })
+    lib.showContext('rsg_chest_admin_one')
+end
+
+RegisterNetEvent('rsg_chest:client:adminMenu', function()
+    local list = lib.callback.await('rsg_chest:server:adminList', false)
+    if not list then return Notify(false, T.not_allowed) end
+    local pos = GetEntityCoords(PlayerPedId())
+    for _, c in ipairs(list) do
+        c.coords = toVec(c.coords)
+        c.dist = #(pos - c.coords)
+    end
+    table.sort(list, function(a, b) return a.dist < b.dist end)
+
+    local options = {}
+    for i, c in ipairs(list) do
+        if i > 100 then break end -- les 100 plus proches
+        local tags = (c.broken and T.admin_tag_broken or '') .. (c.shared > 0 and T.admin_tag_shared:format(c.shared) or '')
+        options[#options + 1] = {
+            title = T.admin_entry:format(c.id, c.type, c.owner or '?'),
+            description = T.admin_entry_d:format(c.dist, tags),
+            icon = c.broken and 'burst' or 'box',
+            onSelect = function() AdminChest(c) end,
+        }
+    end
+    if #options == 0 then options[1] = { title = T.admin_none, readOnly = true } end
+    lib.registerContext({ id = 'rsg_chest_admin', title = T.admin_title, options = options })
+    lib.showContext('rsg_chest_admin')
+end)
+
+---------------------------------------------------------------------
 -- Menu du coffre
 ---------------------------------------------------------------------
 function OpenChestMenu(id)
@@ -497,7 +624,7 @@ function OpenChestMenu(id)
             add({ title = T.menu_warrant, icon = 'file-signature', onSelect = function() IssueWarrant(id) end })
         end
         if info.canSeize then
-            add({ title = T.menu_seize, icon = 'gavel', onSelect = function() Seize(id) end })
+            add({ title = T.menu_seize, icon = 'gavel', onSelect = function() Seize(id, info.evidence) end })
         end
         if not info.isOwner then
             add({ title = T.menu_logs, icon = 'list', onSelect = function() ShowLogs(id) end })
@@ -528,7 +655,7 @@ if Config.Interaction == 'prompt' then
             if Loaded then
                 local pos = GetEntityCoords(PlayerPedId())
                 local nearest, nearestDist
-                for _, chest in pairs(Chests) do
+                for _, chest in pairs(Spawned) do
                     if chest.entity then
                         local d = #(pos - chest.coords)
                         if d <= Config.InteractDistance and (not nearestDist or d < nearestDist) then

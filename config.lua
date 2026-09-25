@@ -63,10 +63,15 @@ Config.BlacklistZones = {
 Config.Code = {
     Length      = 4,     -- nombre de chiffres = nombre de molettes du cryptex (3 à 8)
     UseNui      = true,  -- true = interface cryptex (N°05), false = fenêtre texte ox_lib
+    SoundVolume = 0.5,   -- sons du cryptex (0 = coupé, 1 = max)
     Salt        = 'change_moi_rsg_chest', -- changez cette valeur sur votre serveur
     MaxAttempts = 3,     -- essais avant blocage
     LockTime    = 120,   -- secondes de blocage après trop d'essais
     NotifyOwnerOnFail = true,
+    -- blocage du coffre entier (tous joueurs confondus, contre les multi-personnages)
+    ChestMaxFails   = 10,  -- échecs...
+    ChestFailWindow = 600, -- ...en X secondes
+    ChestLockTime   = 900, -- durée du blocage (secondes)
 }
 
 ---------------------------------------------------------------------
@@ -132,13 +137,35 @@ Config.Perquisition = {
 
     CanSeize        = true,   -- saisie (suppression) du coffre
     SeizeMinGrade   = 1,
-    SeizeRequireEmpty = false, -- si false, le contenu est détruit avec le coffre
+    SeizeRequireEmpty = false, -- si false, le contenu part aux scellés (ou est détruit, voir Config.Evidence)
     SeizeGiveItem   = false,  -- donne l'item du coffre à l'agent
 
     -- Règles
     MinOfficersNearby = 2,    -- agents en service à proximité (agent qui fouille inclus)
     OfficersRadius    = 20.0,
     Cooldown          = 1800, -- secondes entre deux fouilles d'un même coffre
+}
+
+---------------------------------------------------------------------
+-- Scellés : le contenu d'un coffre saisi est conservé comme pièce à conviction
+---------------------------------------------------------------------
+Config.Evidence = {
+    Enabled   = true,         -- false = le contenu saisi est détruit
+    MinGrade  = 0,            -- grade minimum pour consulter les scellés (/scelles)
+    Slots     = 200,
+    Weight    = 5000000,
+    ListLimit = 30,
+    -- lieux où les scellés se consultent (vide = partout)
+    Locations = {
+        -- { coords = vector3(-278.4, 805.3, 119.4), radius = 6.0 }, -- ex : bureau du shérif de Valentine
+    },
+}
+
+---------------------------------------------------------------------
+-- Admin
+---------------------------------------------------------------------
+Config.Admin = {
+    Permission = 'admin',     -- permission RSG pour /chestadmin, /chestdelete, /chestnearest, /chestclean
 }
 
 ---------------------------------------------------------------------
@@ -221,125 +248,6 @@ Config.LogsLimit = 25
 Config.Webhook = ''           -- webhook Discord (vide = désactivé)
 
 ---------------------------------------------------------------------
--- Textes
+-- Langue : 'fr' ou 'en' (fichiers dans locales/)
 ---------------------------------------------------------------------
-Config.Text = {
-    prompt_group    = 'Coffre',
-    prompt_interact = 'Interagir',
-    menu_open       = 'Ouvrir (code)',
-    menu_open_desc  = 'Entrer le code pour ouvrir le coffre',
-    menu_change     = 'Changer le code',
-    menu_pickup     = 'Ramasser le coffre',
-    menu_search     = 'Perquisitionner',
-    menu_search_desc = 'Fouiller le coffre sans code (forces de l\'ordre)',
-    menu_seize      = 'Saisir le coffre',
-    menu_logs       = 'Historique',
-    input_code      = 'Code',
-    input_confirm   = 'Confirmer le code',
-    input_old       = 'Ancien code',
-    input_new       = 'Nouveau code',
-    title_new       = 'Définir le code du coffre',
-    nui_validate    = 'Valider',
-    nui_next        = 'Suivant',
-    nui_reset       = 'Remettre',
-    nui_cancel      = 'Annuler',
-    nui_help        = 'Molette / ▲▼ pour tourner · chiffres du clavier · Entrée pour valider · Échap pour annuler',
-    nui_step        = 'Étape %d / %d',
-    placing         = 'Installation du coffre...',
-    searching       = 'Perquisition en cours...',
-    placement_help  = '[ENTRÉE] Valider  [RETOUR] Annuler  \n[Q/E] Rotation  [FLÈCHES] Déplacer  \n[PG↑/PG↓] Hauteur  [R] Sol  [G] Figer  [SHIFT] Rapide',
-    code_mismatch   = 'Les codes ne correspondent pas.',
-    code_invalid    = 'Le code doit contenir %d chiffres.',
-    placed          = 'Coffre installé.',
-    wrong_code      = 'Code incorrect. (%d essai(s) restant(s))',
-    locked          = 'Serrure bloquée, réessayez dans %d secondes.',
-    code_changed    = 'Code modifié.',
-    picked_up       = 'Coffre ramassé.',
-    not_empty       = 'Le coffre doit être vide.',
-    too_far         = 'Trop loin.',
-    too_close       = 'Trop proche d\'un autre coffre.',
-    blacklisted     = 'Impossible de poser un coffre ici.',
-    max_reached     = 'Vous avez atteint la limite de coffres (%d).',
-    no_item         = 'Vous n\'avez pas cet objet.',
-    not_allowed     = 'Vous n\'êtes pas autorisé.',
-    not_owner       = 'Ce coffre ne vous appartient pas.',
-    invalid_model   = 'Modèle de coffre invalide, contactez un admin.',
-    cancelled       = 'Annulé.',
-    searched_owner  = 'Votre coffre (#%d) est en train d\'être perquisitionné !',
-    fail_owner      = 'Quelqu\'un essaie de forcer votre coffre (#%d) !',
-    seized          = 'Coffre saisi.',
-    seize_confirm   = 'Saisir définitivement ce coffre ?',
-    seize_confirm_d = 'Le coffre sera retiré et son contenu détruit.',
-    no_logs         = 'Aucun historique.',
-    already_placing = 'Vous êtes déjà en train de placer un objet.',
-
-    -- partage
-    menu_open_shared = 'Ouvrir',
-    menu_open_shared_d = 'Vous avez accès à ce coffre',
-    menu_access     = 'Gérer les accès',
-    access_title    = 'Accès au coffre',
-    access_add_player = 'Ajouter un joueur proche',
-    access_add_gang = 'Ajouter mon gang (%s)',
-    access_add_job  = 'Ajouter mon métier (%s)',
-    access_remove   = 'Retirer l\'accès',
-    access_none_near = 'Aucun joueur à proximité.',
-    access_added    = 'Accès ajouté.',
-    access_removed  = 'Accès retiré.',
-    access_exists   = 'Cet accès existe déjà.',
-    access_max      = 'Nombre maximum d\'accès atteint (%d).',
-    access_player   = 'Joueur',
-    access_gang     = 'Gang',
-    access_job      = 'Métier',
-
-    -- mandats
-    menu_warrant    = 'Délivrer un mandat',
-    warrant_title   = 'Mandat de perquisition',
-    warrant_target  = 'Cible',
-    warrant_t_chest = 'Ce coffre (#%d)',
-    warrant_t_owner = 'Le propriétaire (tous ses coffres)',
-    warrant_t_citizen = 'Citoyen (ID joueur ou citizenid)',
-    warrant_citizen = 'ID joueur ou citizenid',
-    warrant_reason  = 'Motif',
-    warrant_hours   = 'Durée (heures)',
-    warrant_issued  = 'Mandat #%d délivré.',
-    warrant_revoked = 'Mandat révoqué.',
-    warrant_valid   = 'Mandat #%d valide',
-    warrant_none    = 'Aucun mandat valide',
-    warrant_list    = 'Mandats en cours',
-    warrant_revoke  = 'Révoquer',
-    warrant_empty   = 'Aucun mandat en cours.',
-    warrant_bad_target = 'Cible introuvable.',
-    no_warrant      = 'Un mandat valide est nécessaire.',
-    not_enough_officers = 'Il faut au moins %d agents sur place.',
-    search_cooldown = 'Ce coffre a déjà été fouillé, réessayez dans %d min.',
-
-    -- crochetage
-    menu_lockpick   = 'Crocheter',
-    menu_lockpick_d = 'Nécessite un crochet',
-    lockpick_title  = 'Crochetage',
-    lockpick_help   = 'Tournez la molette jusqu\'au déclic, puis bloquez (Espace). ← → pour changer de molette.',
-    lockpick_lock   = 'Bloquer',
-    lockpick_slip   = 'Le crochet a glissé...',
-    lockpick_broken = 'Votre crochet s\'est cassé.',
-    lockpick_success = 'La serrure cède.',
-    lockpick_timeout = 'Trop lent, la serrure s\'est refermée.',
-    lockpick_cooldown = 'La serrure a déjà été forcée récemment, réessayez dans %d s.',
-    lockpick_owner  = 'Quelqu\'un crochète votre coffre (#%d) !',
-
-    -- dynamite
-    menu_dynamite   = 'Poser de la dynamite',
-    menu_dynamite_d = 'Fait sauter la serrure, très bruyant',
-    dynamite_plant  = 'Pose de la dynamite...',
-    dynamite_lit    = 'Mèche allumée ! Éloignez-vous (%d s).',
-    dynamite_countdown = 'Explosion dans %d s',
-    dynamite_armed  = 'De la dynamite est déjà posée.',
-    menu_loot       = 'Fouiller le coffre éventré',
-    menu_loot_d     = 'La serrure a sauté',
-    chest_destroyed = 'Le coffre (#%d) a été détruit.',
-
-    -- alertes
-    alert_lockpick  = 'Tentative d\'effraction sur un coffre signalée.',
-    alert_dynamite  = 'Explosion signalée ! Un coffre a été dynamité.',
-    alert_blip      = 'Alerte : coffre',
-    need_item       = 'Il vous faut : %s.',
-}
+Config.Locale = 'fr'
