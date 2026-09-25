@@ -5,6 +5,25 @@
 local Placement = Config.Placement
 local Keys = Placement.Keys
 local IsPlacing = false
+local BadModels = {}
+
+--- Charge un modèle sans jamais faire planter le script.
+--- Si le modèle ne se charge pas, essaie Config.FallbackModel.
+--- @return integer|nil hash du modèle chargé
+function LoadChestModel(model)
+    local function try(name)
+        if not name or BadModels[name] then return nil end
+        local hash = GetHashKey(name)
+        if IsModelInCdimage(hash) and IsModelValid(hash) then
+            local ok = pcall(lib.requestModel, hash, 5000)
+            if ok and HasModelLoaded(hash) then return hash end
+        end
+        BadModels[name] = true
+        print(('[rsg_chest] ^1Le modèle "%s" ne se charge pas^7 : remplacez-le dans config.lua (redm.info/props ou spooni.pages.dev/props)'):format(name))
+        return nil
+    end
+    return try(model) or (Config.FallbackModel ~= model and try(Config.FallbackModel)) or nil
+end
 
 local function DrawLine3D(a, b, r, g, bl, alpha)
     Citizen.InvokeNative(0x6B7256074AE34680, a.x, a.y, a.z, b.x, b.y, b.z, r, g, bl, alpha) -- DRAW_LINE
@@ -87,15 +106,13 @@ function StartPlacement(model)
         return nil
     end
 
-    local hash = GetHashKey(model)
-    if not IsModelInCdimage(hash) then
-        print(('[rsg_chest] ^1Modèle introuvable : %s^7 (vérifiez sur redm.info/props ou spooni.pages.dev/props)'):format(model))
+    local hash = LoadChestModel(model)
+    if not hash then
         lib.notify({ description = Config.Text.invalid_model, type = 'error' })
         return nil
     end
 
     IsPlacing = true
-    lib.requestModel(hash, 5000)
 
     local ped = PlayerPedId()
     local start = GetOffsetFromEntityInWorldCoords(ped, 0.0, 1.5, 0.0)

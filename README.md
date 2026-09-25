@@ -52,7 +52,9 @@ Modifier `model` dans `Config.Chests`. Listes de props :
 - https://redm.info/props
 - https://spooni.pages.dev/props
 
-Si un modèle n'existe pas, un message rouge apparaît en F8 et le placement est refusé.
+Tapez `/chestmodels` en jeu : la console F8 indique **OK** ou **ÉCHEC** pour chaque modèle de la config.
+Si un modèle ne se charge pas, un message rouge apparaît en F8 et `Config.FallbackModel` est utilisé à la place,
+pour que le coffre reste visible et accessible.
 
 ## Jobs de perquisition
 `Config.Perquisition.Jobs = { vallaw = 0, ... }` (nom du job = grade minimum). `AllowJobTypeLeo` autorise aussi tout job de type `leo`.

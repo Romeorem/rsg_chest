@@ -80,13 +80,11 @@ local function AddTarget(chest)
 end
 
 local function SpawnChest(chest)
-    local hash = GetHashKey(chest.model)
-    if not IsModelInCdimage(hash) then
-        print(('[rsg_chest] ^1Modèle introuvable : %s (coffre #%d)^7'):format(chest.model, chest.id))
-        chest.invalid = true
+    local hash = LoadChestModel(chest.model)
+    if not hash then
+        chest.invalid = true -- ni le modèle ni le modèle de secours : on n'essaie plus
         return
     end
-    lib.requestModel(hash, 5000)
     local obj = CreateObject(hash, chest.coords.x, chest.coords.y, chest.coords.z, false, false, false)
     SetEntityCoordsNoOffset(obj, chest.coords.x, chest.coords.y, chest.coords.z, false, false, false)
     SetEntityRotation(obj, chest.rot.x, chest.rot.y, chest.rot.z, 2, true)
@@ -132,7 +130,11 @@ CreateThread(function()
             local pos = GetEntityCoords(PlayerPedId())
             for _, chest in ipairs(GetChestsNear(pos)) do
                 if not chest.entity and not chest.invalid and #(pos - chest.coords) < Config.SpawnDistance then
-                    SpawnChest(chest)
+                    local ok, err = pcall(SpawnChest, chest)
+                    if not ok then
+                        chest.invalid = true
+                        print(('[rsg_chest] ^1coffre #%d non affiché : %s^7'):format(chest.id, tostring(err)))
+                    end
                 end
             end
             for _, chest in pairs(Spawned) do
@@ -634,6 +636,18 @@ function OpenChestMenu(id)
     lib.registerContext({ id = 'rsg_chest_menu', title = chest.label, options = options })
     lib.showContext('rsg_chest_menu')
 end
+
+---------------------------------------------------------------------
+-- /chestmodels : teste le chargement de chaque modèle de la config
+---------------------------------------------------------------------
+RegisterCommand('chestmodels', function()
+    for key, cfg in pairs(Config.Chests) do
+        local hash = GetHashKey(cfg.model)
+        local ok = IsModelInCdimage(hash) and IsModelValid(hash) and pcall(lib.requestModel, hash, 5000) and HasModelLoaded(hash)
+        print(('[rsg_chest] %s  %-12s %s'):format(ok and '^2OK^7  ' or '^1ÉCHEC^7', key, cfg.model))
+        if ok then SetModelAsNoLongerNeeded(hash) end
+    end
+end, false)
 
 ---------------------------------------------------------------------
 -- Prompt natif RedM

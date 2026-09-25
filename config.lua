@@ -19,7 +19,7 @@ Config.Chests = {
     small = {
         item   = 'chest_small',
         label  = 'Petit coffre',
-        model  = 'p_chest01x',
+        model  = 'p_chestmedburied01x', -- p_chest01x ne se charge pas en jeu
         slots  = 15,
         weight = 50000,       -- en grammes
     },
@@ -45,6 +45,9 @@ Config.Chests = {
         weight = 30000,
     },
 }
+
+-- Modèle utilisé si celui d'un coffre ne se charge pas (le coffre reste visible)
+Config.FallbackModel = 'p_chestmedburied01x'
 
 Config.MaxChestsPerPlayer = 3      -- 0 = illimité
 Config.MinDistanceBetween  = 2.0   -- distance mini entre deux coffres
